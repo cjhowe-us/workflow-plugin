@@ -28,6 +28,7 @@ file and use it as the starting point for the new document.
 | Phase progress | `templates/phase-progress.md` | Per-phase rollup (specify / design / plan / release) |
 | Locks registry | `templates/locks.md` | Active coarse interactive locks |
 | In-flight registry | `templates/in-flight.md` | Running background tasks |
+| Harmonize run lock | `templates/harmonize-run-lock.md` | Serialize root `/harmonize` chains |
 | Release plan | `templates/release-plan.md` | Release checklist and rollout |
 
 ## How to Use

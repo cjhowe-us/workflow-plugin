@@ -41,9 +41,12 @@ locks.
 ## Autonomous `run` mode (no approval)
 
 In **`mode: run`** (including bare `/harmonize`), **never** call `AskUserQuestion` for planning,
-prioritization, or “should I proceed?”. Start work immediately. Only escalate interactively for
-**unrecoverable** blocks (e.g. `gh` not authenticated, corrupted state file, dependency cycle) where
-no safe automated action exists.
+prioritization, or “should I proceed?”. Start work immediately.
+
+**Exception — global run lock (§0b):** when another chain may still be live, **`AskUserQuestion` is
+**required** so the user picks cancellation, a takeover path, or stale-lock handling. No other
+**`AskUserQuestion`** in autonomous `run` / **`merge-detection`** / **`resume`** unless an
+**unrecoverable** block remains after that (e.g. `gh` not authenticated, corrupted state file).
 
 **Stash gate:** modes that mutate orchestration state (**§0**) require a **clean** primary checkout
 and **`main`** `HEAD`. Do **not** auto-stash — the user must commit or stash before `/harmonize`.
@@ -61,6 +64,7 @@ memory — state and conventions live in the skill.
 | Repository | `/Users/cjhowe/Code/harmonius` |
 | State dir | `docs/plans/` |
 | Lock file | `docs/plans/locks.md` |
+| Run lock file | `docs/plans/harmonize-run-lock.md` |
 | In-flight file | `docs/plans/in-flight.md` |
 | Per-phase progress | `docs/plans/progress/phase-{specify,design,plan,release}.md` |
 | Per-plan progress | `docs/plans/progress/PLAN-<id>.md` |
@@ -107,12 +111,17 @@ TaskCreate({
 
 Create intermediary tasks for each step below, update them pending → in_progress → completed.
 
+**Order:** create the parent task **first** (this section), then **§0** stash gate, then **§0b** run
+lock + optional in-flight auto-reset — so `root_task_id` exists before writing
+`harmonize-run-lock.md`.
+
 ## Execution flow
 
 ### 0. Stash gate (clean primary checkout)
 
 When **`mode`** is **`run`**, **`merge-detection`**, **`dispatch-only`**, or **`resume`**, run this
-**before** any other step. **Skip** for **`status`**, **`stop`**, and **`post-merge-dispatch`**.
+**before** any other step **after** the parent `TaskCreate` above. **Skip** for **`status`**,
+**`stop`**, and **`post-merge-dispatch`**.
 
 Let `REPO` be the repository path from Prerequisites (default `/Users/cjhowe/Code/harmonius`).
 
@@ -134,6 +143,71 @@ Let `REPO` be the repository path from Prerequisites (default `/Users/cjhowe/Cod
    the primary checkout must be clean; they should **`git stash push -u -m "harmonize-gate"`** (or
    commit), confirm `git status` is clean on `main`, then re-run `/harmonize`. Never run `git stash`
    on the user’s behalf.
+
+### 0b. Global run lock + auto-reset in-flight
+
+**Skip entirely** when the prompt indicates **`mode: post-merge-dispatch`** (the continuation owns
+the lock acquired by the root pass).
+
+Let `RUN_LOCK` be `docs/plans/harmonize-run-lock.md`. If missing, create it from the
+`document-templates` skill template `harmonize-run-lock.md`.
+
+#### Acquire run lock (single active root chain) — **before** any flush
+
+Acquire when **`mode`** is **`run`** (and not `post-merge-dispatch`), **`merge-detection`**, or
+**`resume`**. **Do not** acquire for **`post-merge-dispatch`**, **`dispatch-only`**, **`status`**,
+**`stop`**.
+
+1. Read `RUN_LOCK` front matter.
+2. If `active` is true and any of `root_task_id`, `merge_detection_task_id`, `continuation_task_id`
+   is non-null, evaluate **contention**:
+   - **When `TaskGet` / `TaskList` exist:** collect each non-null id. If **every** id is missing or
+     **terminal** (completed / stopped / failed), treat the lock as **stale** — append a
+     **`phase-plan.md`** event `harmonize: cleared stale run lock (all holder tasks terminal)` and
+     go to step 3. If **any** id is **still running**, **contention** — go to **2b**.
+   - **When those APIs are absent:** if `chain_started_at` is within the **last 6 hours**, treat as
+     **contention** (unknown liveness) — go to **2b**. Otherwise treat as stale and go to step 3.
+
+2b. **Resolve contention with `AskUserQuestion`** (required when this step is reached). Summarize
+which task ids are involved and what `TaskGet` showed (if available). If `AskUserQuestion` is
+**unavailable**, **stop** with the same summary and tell the user to run **`/harmonize stop`** or
+**`/harmonize reset-in-flight`** after verifying no live chain.
+
+   Offer at least these options (labels may be shortened for the UI):
+
+   | User choice | Agent action |
+   |-------------|--------------|
+   | **Cancel this pass** | Complete the parent task; return a short status — **do not** acquire the lock or dispatch. |
+   | **Stop other chain, then continue** | For each non-null holder id, **`TaskStop`** when APIs exist; remove matching rows from **`in-flight.md`**; set **`RUN_LOCK`** inactive (all nulls); append **`phase-plan.md`** event; then **repeat §0b from step 1** (re-acquire for this pass). If **`TaskStop`** is missing, say so and do **not** claim this option resolved — fall back to **Clear stale lock** only after user confirms. |
+   | **Clear lock — other tasks are dead / I accept overlap risk** | Set **`RUN_LOCK`** inactive (all nulls), append **`phase-plan.md`** event with reason `user forced run lock clear`, then go to **step 3**. **Do not** assume you can stop remote tasks without **`TaskStop`**. |
+
+After a successful **takeover** path (second or third row), continue normal execution from
+**step 3** or the repeated **§0b** flow as indicated.
+
+3. If not stopped, write `RUN_LOCK` with:
+   - `active: true`
+   - `chain_started_at: <ISO 8601 UTC now>`
+   - `root_task_id: <this pass’s parent TaskCreate id>`
+   - `merge_detection_task_id: null`
+   - `continuation_task_id: null`
+
+**`stop`** mode must clear the run lock after §3: set `active: false` and null all task id fields.
+
+#### Auto-reset in-flight (root `run` only) — **after** successful acquire
+
+When **`mode: run`** and the prompt does **not** contain `post-merge-dispatch`, **and** the run lock
+was just acquired above:
+
+1. Set `in_flight: []` in `docs/plans/in-flight.md` (overwrite body; keep the standard
+   title/sections from the template as needed).
+2. Update `docs/plans/progress/phase-plan.md`: bump `last_updated` to now (UTC), append to
+   **Event log**: `harmonize: auto-reset in-flight at root run start (flush registry)`.
+
+This removes stale rows after killed agent trees so the user never needs a manual **`/harmonize reset-in-flight`** before **`/harmonize`**.
+
+**Do not** auto-flush for **`post-merge-dispatch`**, standalone **`merge-detection`**, **`resume`**,
+or **`dispatch-only`** — those passes rely on existing registry rows until their reconcile steps
+run.
 
 ### 1. Read all state
 
@@ -185,6 +259,9 @@ what remains) → **§4** → **§6–9**.
 
 **`mode: run`** (root) and other modes: **§1 → §2 → §3 → §4 → §5** as written below.
 
+**`mode: stop`:** after the §3 loop finishes (every in-flight task stopped or removed), clear
+**`RUN_LOCK`** (`active: false`, all task id fields null).
+
 ### 4. Enforce coarse locks
 
 For each entry in `locks.md`:
@@ -223,7 +300,9 @@ Agent({
 })
 ```
 
-3. Record `merge_detection_task_id` from the tool result. Write it to `in-flight.md`.
+3. Record `merge_detection_task_id` from the tool result. Write it to `in-flight.md`. For
+**`mode: run`** (root) and **`mode: merge-detection`**, also write the same id to **`RUN_LOCK`**
+(`merge_detection_task_id` field).
 
 #### 5b. Await merge + re-read
 
@@ -242,6 +321,9 @@ Agent({
   run_in_background: true
 })
 ```
+
+Record the continuation’s `task_id` in **`RUN_LOCK`** as `continuation_task_id` (**`mode: run`**
+root only).
 
 The continuation runs **`mode: post-merge-dispatch`**: **§1** read state → **§5b** await → reconcile
 merge task and remove its `in-flight` row → **§3** (reconcile + restart sweep on remaining rows) →
@@ -346,6 +428,14 @@ Update each per-phase progress file:
 
 ### 9. Report summary
 
+**Release global run lock** before the summary when **`mode`** is **`post-merge-dispatch`**,
+**`merge-detection`**, **`resume`**, or **`dispatch-only`**: set `docs/plans/harmonize-run-lock.md`
+to `active: false` with `root_task_id`, `merge_detection_task_id`, and `continuation_task_id` all
+null. **Never** release from **`mode: run`** (root pass) — the **`post-merge-dispatch`**
+continuation always releases after its dispatch wave.
+
+Append a **`phase-plan.md`** event when releasing: `harmonize: released global run lock (<mode>)`.
+
 Return the SDLC status summary format defined in the `harmonize` skill. Complete the parent task for
 this pass.
 
@@ -361,6 +451,7 @@ this pass.
 | Lock cycle detected | Report to user, pick earlier claim |
 | Stale lock | Report only, do not auto-clear |
 | Stash gate failure (dirty tree or not on `main`) | **Stop** — user must stash/commit (§0) |
+| Global run lock contention | **`AskUserQuestion`** per §0b **2b** — cancel, takeover via **`TaskStop`**, or forced clear; if the tool is missing, **stop** with instructions (§0b) |
 
 ## Idempotency
 
@@ -389,3 +480,4 @@ Running this agent twice back-to-back must be safe:
 - Delete state files without explicit user confirmation
 - Skip `TaskStop` when enforcing a lock against in-flight tasks
 - Auto-stash or discard the user’s uncommitted work to bypass the stash gate
+- Ignore **`RUN_LOCK`** contention without **`AskUserQuestion`** (§0b **2b**) when the tool exists

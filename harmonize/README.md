@@ -122,6 +122,7 @@ The `markdown` skill is provided by the `rumdl` plugin.
 | Phase progress | `skills/document-templates/templates/phase-progress.md` |
 | Locks registry | `skills/document-templates/templates/locks.md` |
 | In-flight registry | `skills/document-templates/templates/in-flight.md` |
+| Harmonize run lock | `skills/document-templates/templates/harmonize-run-lock.md` |
 | Release plan | `skills/document-templates/templates/release-plan.md` |
 | Feature | `skills/document-templates/templates/feature.md` |
 | Requirement | `skills/document-templates/templates/requirement.md` |
@@ -157,6 +158,7 @@ Per-project state lives in the Harmonius repo under `docs/plans/`:
 | `docs/plans/progress/PLAN-<id>.md` | Per-plan detail progress |
 | `docs/plans/locks.md` | Active coarse interactive locks |
 | `docs/plans/in-flight.md` | Running background tasks |
+| `docs/plans/harmonize-run-lock.md` | At most one root harmonize chain at a time |
 
 ## License
 

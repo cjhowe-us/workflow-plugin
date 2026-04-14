@@ -43,6 +43,9 @@ When the user invokes **`/harmonize`** with **no** arguments, or **`/harmonize r
 
 1. **No approval gate** — do **not** call `AskUserQuestion`, do **not** ask which plan or subsystem
    to prioritize, do **not** wait for the user to confirm a “go” after printing status.
+   **Exception:** the **harmonize** master agent **must** call **`AskUserQuestion`** when
+   **`docs/plans/harmonize-run-lock.md`** indicates a **live or ambiguous** chain (see agent §0b
+   **2b**) so the user can cancel, stop the other chain, or force-clear a stale lock.
 2. **No foreground blocking** — do **not** run `CronList` / `CronCreate` in the foreground before
    dispatch. The **harmonize** master agent performs cron bootstrap in the background per its
    playbook.
@@ -65,8 +68,8 @@ When the user invokes **`/harmonize`** with **no** arguments, or **`/harmonize r
    - If those APIs are **absent** (typical Cursor hosts): treat the file as **stale** after a killed
      tree — **flush** `in_flight` to `[]`, append a **`phase-plan.md` event**, then spawn **fresh**
      orchestrators (never assume dead `task_id` values are still stoppable).
-   **`status`** and **`merge-detection`** do not stop running tasks; **`stop`** stops them without
-   redispatch.
+**`status`** and **`merge-detection`** do not stop running tasks; **`stop`** stops them without
+redispatch.
 
 Use **`/harmonize status`** (or `status` argument) only when the user wants a read-only summary with
 **no** background dispatch.
@@ -94,9 +97,9 @@ If dirty, **stop** — no orchestrator dispatch. The user runs
 ## Killed agent trees (`in-flight.md` orphans)
 
 Stopping nested background agents in the IDE (or dropping a session) can leave
-**`docs/plans/in-flight.md`** rows whose **`task_id` values are dead**. Without **`TaskList` /
-`TaskStop`**, the host cannot tell live tasks from ghosts, so the registry may block locks or
-duplicate dispatch.
+**`docs/plans/in-flight.md`** rows whose **`task_id` values are dead**. Without
+**`TaskList` / `TaskStop`**, the host cannot tell live tasks from ghosts, so the registry may block
+locks or duplicate dispatch.
 
 | Situation | Handler action |
 |-----------|----------------|
@@ -288,6 +291,7 @@ not open PRs; it commits review fixes to an existing PR.
 | `docs/plans/progress/phase-{specify,design,plan,release}.md` | Phase rollups | Phase orchestrators |
 | `docs/plans/progress/PLAN-<id>.md` | Per-plan detail | plan-implementer, pr-reviewer |
 | `docs/plans/locks.md` | Active coarse locks | Sub-skills (claim/release), harmonize agent (report only) |
+| `docs/plans/harmonize-run-lock.md` | One root harmonize chain at a time; live/ambiguous contention → **`AskUserQuestion`** (agent §0b) | harmonize master |
 | `docs/plans/in-flight.md` | Running background tasks | harmonize agent, phase orchestrators |
 
 ## Routing on invocation
@@ -321,9 +325,9 @@ switch.
 A bare `/harmonize` (no argument) must **not** stop at status-only or merge-detect alone. Dispatch
 the `harmonize` master agent in background with default mode `run` so it:
 
-1. Reconciles **`in-flight.md`** per the **[Killed agent trees](#killed-agent-trees-in-flightmd-orphans)**
-   restart sweep (`TaskStop` when task APIs exist; **flush** when they do not), enforces locks,
-   re-reads phase + `PLAN-*` files.
+1. Reconciles **`in-flight.md`** per the
+   **[Killed agent trees](#killed-agent-trees-in-flightmd-orphans)** restart sweep (`TaskStop` when
+   task APIs exist; **flush** when they do not), enforces locks, re-reads phase + `PLAN-*` files.
 2. Starts **`plan-orchestrator`** **`merge-detection`** in the background and chains **`harmonize`**
    **`post-merge-dispatch`** so merge completes **before** implementers without the root pass
    blocking on polls — for each `PLAN-*` with a PR, **`gh pr view`**; archive merged plans; update
