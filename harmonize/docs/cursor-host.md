@@ -110,5 +110,7 @@ re-run default **`/harmonize`** (`mode: run`).
 It always writes **`docs/plans/.cursor-hook-unblock-pending.json`** with **`last_unblock_hook_at`**
 (so the hook is observable even when it does nothing else). When no duplicate harmonize work is
 in flight, it emits **`followup_message`** to run **`mode: unblock-workflow`** (full gh pass + post-merge
-dispatch). It skips emitting when **`harmonize-run-lock.md`** is **`active: true`** or **`in-flight.md`**
-already lists a **`plan-orchestrator`** row for **`unblock-workflow-gh`** / **`merge-detection`**.
+dispatch). It skips emitting when **`harmonize-run-lock.md`** is **`active: true`**, **`in-flight.md`**
+already lists a **`plan-orchestrator`** row for **`unblock-workflow-gh`** / **`merge-detection`**, or
+**`last_followup_emit_epoch`** is within **`HARMONIZE_UNBLOCK_HOOK_DEBOUNCE_SEC`** (default **90**)
+seconds — so rapid nested **`SubagentStop`** events do not enqueue duplicate follow-ups.

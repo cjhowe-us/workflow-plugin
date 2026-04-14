@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # SubagentStop: always record unblock hook run; emit followup_message only when no duplicate work.
-# Skips when harmonize run lock is active or in-flight already has plan-orchestrator unblock/merge pass.
+# Skips emit when harmonize run lock is active, in-flight already has plan-orchestrator unblock pass,
+# or a followup was emitted in the last DEBOUNCE_SEC (rapid nested stops).
 set -euo pipefail
 
 INPUT=$(cat)
@@ -9,6 +10,8 @@ if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' '{}'
   exit 0
 fi
+
+DEBOUNCE_SEC="${HARMONIZE_UNBLOCK_HOOK_DEBOUNCE_SEC:-90}"
 
 main_repo_root() {
   local d="$1"
@@ -45,16 +48,43 @@ fi
 mkdir -p "$ROOT/docs/plans"
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+NOW_EPOCH=$(date -u +%s)
 PENDING="$ROOT/docs/plans/.cursor-hook-unblock-pending.json"
+
+prev_epoch=0
+if [[ -f "$PENDING" ]] && jq empty "$PENDING" 2>/dev/null; then
+  prev_epoch=$(jq -r '.last_followup_emit_epoch // 0' "$PENDING" 2>/dev/null || echo 0)
+fi
+[[ "$prev_epoch" =~ ^[0-9]+$ ]] || prev_epoch=0
+
+debounced=0
+if [[ "$prev_epoch" -gt 0 && "$((NOW_EPOCH - prev_epoch))" -lt "$DEBOUNCE_SEC" ]]; then
+  debounced=1
+fi
 
 tmp="${PENDING}.tmp.$$"
 if [[ -f "$PENDING" ]] && jq empty "$PENDING" 2>/dev/null; then
-  jq --arg now "$NOW" --arg reason subagent_stop --arg repo "$ROOT" \
-    '. + {requested_at: $now, last_unblock_hook_at: $now, reason: $reason, repo: $repo}' \
-    "$PENDING" >"$tmp"
+  jq --arg now "$NOW" --argjson epoch "$NOW_EPOCH" --arg reason subagent_stop --arg repo "$ROOT" \
+    --argjson deb "$debounced" \
+    '. + {
+      requested_at: $now,
+      last_unblock_hook_at: $now,
+      reason: $reason,
+      repo: $repo,
+      last_hook_epoch: ($epoch | tonumber),
+      last_emit_skipped_debounce: $deb
+    }' "$PENDING" >"$tmp"
 else
-  jq -n --arg now "$NOW" --arg reason subagent_stop --arg repo "$ROOT" \
-    '{requested_at: $now, last_unblock_hook_at: $now, reason: $reason, repo: $repo}' >"$tmp"
+  jq -n --arg now "$NOW" --argjson epoch "$NOW_EPOCH" --arg reason subagent_stop --arg repo "$ROOT" \
+    --argjson deb "$debounced" \
+    '{
+      requested_at: $now,
+      last_unblock_hook_at: $now,
+      reason: $reason,
+      repo: $repo,
+      last_hook_epoch: ($epoch | tonumber),
+      last_emit_skipped_debounce: $deb
+    }' >"$tmp"
 fi
 mv "$tmp" "$PENDING" || rm -f "$tmp"
 
@@ -82,10 +112,23 @@ if in_flight_has_plan_orchestrator_unblock; then
   exit 0
 fi
 
+if [[ "$debounced" -eq 1 ]]; then
+  printf '%s\n' '{}'
+  exit 0
+fi
+
 msg=$(
   cat <<EOF
 Harmonize unblock workflow (SubagentStop): run a background Task (run_in_background: true, subagent_type: generalPurpose) with prompt starting mode: unblock-workflow, include repo: ${ROOT}, and cite agents/harmonize.md plus docs/cursor-host.md. If Task is unavailable, run agents/harmonize.md inline for the same mode. This pass runs the full unblock chain (gh on PLAN-* PRs, then post-merge dispatch for reviews and ready work). Skip dispatch if docs/plans/in-flight.md already shows an active plan-orchestrator unblock pass.
 EOF
 )
 
-jq -n --arg m "$msg" '{followup_message: $m}'
+if jq -n --arg m "$msg" '{followup_message: $m}' >"${tmp}.out.$$"; then
+  jq --argjson epoch "$NOW_EPOCH" '. + {last_followup_emit_epoch: $epoch}' "$PENDING" >"$tmp" \
+    && mv "$tmp" "$PENDING" || rm -f "$tmp"
+  cat "${tmp}.out.$$"
+  rm -f "${tmp}.out.$$"
+else
+  rm -f "${tmp}.out.$$"
+  printf '%s\n' '{}'
+fi
