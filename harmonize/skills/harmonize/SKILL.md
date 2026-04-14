@@ -5,8 +5,8 @@ description: >
   development lifecycle: feature/requirement/user-story ideation, hierarchical design, design
   review, implementation planning, hierarchical TDD execution, PR review, and release.
   A bare /harmonize immediately dispatches the harmonize master agent in the background (no
-  approval, no “what next?” prompt). The master runs merge detection serially (gh on implementation
-  plan PRs, updates PLAN-* progress), then fans out all unblocked SDLC work in parallel. Routes user
+  approval, no “what next?” prompt). The master chains merge-detection and a post-merge continuation
+  (gh on PLAN-* PRs) before fanning out every unblocked worker in parallel. Routes user
   intent to phase-specific sub-skills for interactive
   work while a background supervisor runs the orchestration tree asynchronously and opens many
   small draft PRs for human review. Use whenever the user wants to plan, design, implement,
@@ -47,14 +47,22 @@ When the user invokes **`/harmonize`** with **no** arguments, or **`/harmonize r
    `run_in_background: true`, and a prompt that begins with `mode: run` plus the repo path. You may
    add a one-line user-facing ack (“Dispatched harmonize run in background.”) **without** waiting
    for a reply.
-4. **Serial merge, then parallel unblock** — the master agent **first** runs **`plan-orchestrator`**
-   in **`merge-detection`** mode to completion (`gh` on every `PLAN-*` with a PR), **re-reads**
-   progress, **then** issues **one** parallel batch of orchestrators (`plan-orchestrator`
-   **`dispatch-only`** + specify + design as needed). Never skip serial merge before dispatch in
-   `mode: run`.
+4. **Ordered merge, then parallel unblock** — **`plan-orchestrator`** **`merge-detection`** must
+   finish (`gh` on every `PLAN-*` with a PR) **before** any implementer dispatch wave. The master
+   achieves this with a **nested background chain** (`post-merge-dispatch`) so the root pass does
+   **not** poll or sleep; the continuation re-reads progress, then issues **one** parallel batch of
+   orchestrators (`plan-orchestrator` **`dispatch-only`** + specify + design as needed). Never skip
+   merge reconciliation before that wave in `mode: run`.
 
 Use **`/harmonize status`** (or `status` argument) only when the user wants a read-only summary with
 **no** background dispatch.
+
+## Nested parallelism (maximum breadth)
+
+Orchestrators should build **deep trees** of **`Agent(..., run_in_background: true)`** calls: one
+branch per unblocked plan (and per specify/design worker), not sequential “one plan at a time”
+scheduling. **Forbidden** for pacing: `bash sleep` or long idle loops in orchestrators — use task
+APIs, completion notifications, or the next harmonize reconciliation pass (`in-flight.md` §3).
 
 ## `/harmonize-*` sub-skills (interactive)
 
@@ -229,17 +237,19 @@ A bare `/harmonize` (no argument) must **not** stop at status-only or merge-dete
 the `harmonize` master agent in background with default mode `run` so it:
 
 1. Reconciles state (locks, in-flight, phase files, `PLAN-*` progress).
-2. Runs **`plan-orchestrator`** **`merge-detection`** **serially to completion** — for each
-   implementation plan progress file with a PR, **`gh pr view`**; archive merged plans; update event
-   logs; refresh `docs/plans/index.md` when the orchestrator recomputes order — **no** worker
-   dispatch in this step.
-3. Re-reads progress and computes each phase’s ready set.
+2. Starts **`plan-orchestrator`** **`merge-detection`** in the background and chains **`harmonize`**
+   **`post-merge-dispatch`** so merge completes **before** implementers without the root pass
+   blocking on polls — for each `PLAN-*` with a PR, **`gh pr view`**; archive merged plans; update
+   event logs; refresh `docs/plans/index.md` when the orchestrator recomputes order — **no** worker
+   dispatch in merge-detection.
+3. The continuation re-reads progress and computes each phase’s ready set.
 4. Dispatches **every** phase orchestrator that has ready work **in one parallel batch** (same
    message, multiple `Agent` calls): **`plan-orchestrator`** **`dispatch-only`** plus
    **`specify-orchestrator`** / **`design-orchestrator`** when applicable. **Per-topic** ordering
    stays **Specify → Design → Plan → TDD**; **across subsystems**, work runs **concurrently**.
-5. Within Phase 3, **dependency order** in `docs/plans/index.md` is enforced by the ready set inside
-   `plan-orchestrator`.
+5. Within Phase 3, **`plan-orchestrator`** fans out **every** ready **`plan-implementer`** /
+   **`pr-reviewer`** in parallel (`run_in_background: true`); **dependency order** in
+   `docs/plans/index.md` stays enforced by the ready set.
 
 Foreground may print a one-line acknowledgment; the master agent returns the full summary when the
 pass completes.
@@ -269,8 +279,8 @@ The cron fires every 15 minutes on off-minutes; Claude receives the prompt, the 
 `/harmonize` to this skill, and the skill routes to `run` mode which dispatches the harmonize master
 agent in background.
 
-If `CronList` or `CronCreate` is unavailable in the master agent, it logs and continues — **serial**
-merge-detection (§5 of the master playbook) still runs that pass before any dispatch.
+If `CronList` or `CronCreate` is unavailable in the master agent, it logs and continues —
+**ordered** merge-detection (§5 of the master playbook) still runs that pass before any dispatch.
 
 ## Manual merge-detection backup
 

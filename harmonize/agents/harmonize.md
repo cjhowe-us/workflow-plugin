@@ -75,10 +75,11 @@ Parse the prompt for a mode keyword. Default is `run`.
 
 | Mode | Behavior |
 |------|----------|
-| `run` | Full cycle: reconcile, enforce locks, **serial** `plan-orchestrator` **merge-detection** (gh, wait until done), re-read state, then **one parallel wave** of orchestrators (`plan-orchestrator` **dispatch-only** + others) |
+| `run` | Full cycle: reconcile, enforce locks, **start** `plan-orchestrator` **merge-detection** in background, **immediately** chain **`post-merge-dispatch`** (nested background `harmonize`) — **no** poll/sleep in this process |
 | `status` | Read state, print summary, do not dispatch |
 | `stop` | Stop every in-flight task, keep locks, report |
-| `merge-detection` | **Only** serial `plan-orchestrator` merge-detection (§5); re-read state; report — no fan-out |
+| `merge-detection` | **Only** `plan-orchestrator` merge-detection (§5 single-spawn); re-read state; report — no fan-out |
+| `post-merge-dispatch` | **Continuation:** await the merge-detection `task_id` from the prompt via `TaskGet`/`TaskOutput` only (no `sleep`), re-read state, then **§6–9** |
 | `dispatch-only` | Skip merge detection; compute ready sets and parallel-dispatch orchestrators |
 | `resume <phase> <subsystem>` | After a lock release, re-scan and dispatch the resource |
 
@@ -124,7 +125,7 @@ bootstrap" section.
 
 If `CronList` / `CronCreate` is unavailable or fails after a best effort, log a warning in the
 phase-plan event log (or stdout summary) and **continue**. Cron is optional; every `mode: run` pass
-still performs **serial** merge-detection before dispatch so PRs advance without the scheduler.
+still performs **ordered** merge-detection before dispatch so PRs advance without the scheduler.
 
 ### 3. Reconcile in-flight tasks
 
@@ -149,18 +150,22 @@ For each entry in `locks.md`:
 
 Under NO circumstances dispatch new work on a locked `(phase, subsystem)` pair.
 
-### 5. Serial merge detection (implementation plans via `gh`)
+### 5. Merge detection + nested dispatch chain (implementation plans via `gh`)
 
-For **`mode: run`** (before the parallel wave) and **`mode: merge-detection`** (standalone pass),
-reconcile merged Phase 3 PRs so progress files and the dependency DAG match GitHub.
+For **`mode: run`**, **`mode: merge-detection`**, and **`mode: post-merge-dispatch`**, reconcile or
+await merge work so the dependency DAG matches GitHub **before** any implementer dispatch wave.
 
-Skip this entire step in **`mode: dispatch-only`**. In **`mode: merge-detection`**, this step **is**
-the main work (then jump to **§8** / **§9** — skip **§6–7**).
+Skip this entire **spawn** subsection in **`mode: dispatch-only`**. In **`mode: merge-detection`**,
+this step **is** the main work (then jump to **§8** / **§9** — skip **§6–7**). In
+**`mode: post-merge-dispatch`**, skip the spawn and jump to **§5b**.
+
+#### 5a. Spawn merge-detection (`mode: run` and `mode: merge-detection` only)
 
 Procedure:
 
-1. If a `plan-orchestrator` task is **already** in `in-flight.md` with a merge-detection prompt,
-   wait for it to finish instead of spawning a duplicate.
+1. If a `plan-orchestrator` task is **already** in `in-flight.md` with a merge-detection prompt, do
+   **not** spawn a duplicate. For **`mode: run`**, still ensure a **`post-merge-dispatch`** child is
+   queued for that existing merge task (spawn continuation if missing).
 2. Otherwise dispatch **exactly one** background agent:
 
 ```text
@@ -172,14 +177,41 @@ Agent({
 })
 ```
 
-3. **Wait until that task completes** — poll `TaskList` / `TaskOutput` / completion notification. Do
-   **not** issue any other `Agent` for new orchestration work in the same turn as this dispatch.
-4. **Re-read** `docs/plans/progress/PLAN-*.md`, `docs/plans/index.md`, and `phase-plan.md` so the
-   ready set reflects merges.
+3. Record `merge_detection_task_id` from the tool result. Write it to `in-flight.md`.
+
+#### 5b. Await merge + re-read
+
+- **`mode: post-merge-dispatch`:** parse `merge_detection_task_id` from the prompt; await that task
+  with `TaskGet` / `TaskOutput` until terminal. **Forbidden:** `bash sleep` for pacing — use only
+  task APIs (or the platform’s blocking task await if available).
+- **`mode: merge-detection`:** await the merge-detection task from §5a the same way.
+- **`mode: run`:** do **not** await here. In the **same** assistant message as §5a, dispatch **one**
+  nested background **`harmonize`** continuation:
+
+```text
+Agent({
+  description: "harmonize post-merge dispatch chain",
+  subagent_type: "harmonize",
+  prompt: "mode: post-merge-dispatch — merge_detection_task_id: <uuid> — repo: /Users/cjhowe/Code/harmonius",
+  run_in_background: true
+})
+```
+
+The continuation runs **`mode: post-merge-dispatch`**, performs the await above, re-reads state,
+then **§6–9**.
+
+After merge-detection completes (**for `post-merge-dispatch` and `merge-detection` only**),
+**re-read** `docs/plans/progress/PLAN-*.md`, `docs/plans/index.md`, and `phase-plan.md` so the ready
+set reflects merges.
+
+**`mode: run` (root pass):** after §5a + continuation dispatch, **skip §6–7**, write §8 notes that
+merge + post-merge chain were scheduled, §9 summary, and **return** — the continuation owns the
+dispatch wave.
 
 ### 6. Compute the phase ready set
 
-Skip in **`mode: merge-detection`** (no dispatch wave).
+Skip in **`mode: merge-detection`** (no dispatch wave) and in **`mode: run`** when this pass is the
+**root** that already dispatched **`post-merge-dispatch`** (continuation computes the ready set).
 
 **Per topic**, readiness follows **Specify → Design → Plan → TDD/Review**.
 **Across different subsystems and independent topics**, compute ready sets **in parallel** — do not
@@ -204,16 +236,21 @@ Subtract any subsystem with an active lock for that phase. Never auto-dispatch `
 
 ### 7. Dispatch phase orchestrators (parallel wave)
 
-**After** §5 completes (for `mode: run`) or immediately (for `mode: dispatch-only`), issue **all**
-orchestrator dispatches in **one** assistant message. Do **not** await one orchestrator’s completion
-before starting another in this wave.
+**After** merge reconciliation and re-read (**`mode: post-merge-dispatch`**, **`mode: dispatch-only`**
+which skips §5 spawn) — issue **all** orchestrator dispatches in **one** assistant message. Do **not**
+await one orchestrator’s completion before starting another in this wave.
+
+**Maximize breadth:** nested orchestrators (`plan-orchestrator`, `specify-orchestrator`,
+`design-orchestrator`) must themselves fan out **every** unblocked worker (`plan-implementer`,
+`pr-reviewer`, phase authors) in parallel with `run_in_background: true` — **never** serialize
+ready plans to “reduce noise”.
 
 Before each `Agent` call, check `in-flight.md`: if that orchestrator is **already** running for this
 pass (same `worker_agent`, task not completed), **skip** spawning a duplicate.
 
-**Always** include **exactly one** `plan-orchestrator` dispatch in **`mode: run`** and
-**`mode: dispatch-only`** so Phase 3 advances. Merge detection already ran in §5 — use **only**
-`dispatch-only`:
+**Always** include **exactly one** `plan-orchestrator` dispatch in **`mode: post-merge-dispatch`**
+and **`mode: dispatch-only`** so Phase 3 advances. Merge detection already completed before this wave
+— use **only** `dispatch-only`:
 
 ```text
 mode: dispatch-only — dispatch ready plan-implementer + pr-reviewer sets per playbook
@@ -245,7 +282,8 @@ Agent({
 })
 ```
 
-In **`mode: merge-detection`**, **skip** this §7 entirely.
+In **`mode: merge-detection`** and **`mode: run`** (root pass that scheduled **`post-merge-dispatch`**),
+**skip** this §7 entirely.
 
 Immediately after each dispatch returns, write the task_id to `in-flight.md` with `phase`,
 `subsystem`, `worker_agent`, `started_at`, and `parent_task_id` (this agent's parent task id).

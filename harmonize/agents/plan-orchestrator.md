@@ -131,14 +131,18 @@ A plan is in the **review set** if `status == code_complete`.
 
 ### 8. Dispatch workers in parallel
 
-For each plan in the ready set: spawn a `plan-implementer` agent via the `Agent` tool, passing
-`plan_id` and `plan_path` in the prompt. Use multiple `Agent` tool calls in one message to dispatch
-in parallel.
+For **every** plan in the ready set: spawn a `plan-implementer` via `Agent` with **`run_in_background:
+true`**, passing `plan_id` and `plan_path` in the prompt. Issue **all** implementer calls in **one**
+message — one nested background tree per plan.
 
-For each plan in the review set: spawn a `pr-reviewer` agent the same way.
+For **every** plan in the review set: spawn a `pr-reviewer` the same way (**`run_in_background:
+true`**), batched in that same message.
 
-Before dispatching, re-read the progress file one more time to avoid double-spawning if a prior run
-is still in flight.
+Before each dispatch, re-read that plan’s progress file once to avoid double-spawning.
+
+**Do not** wait for workers to finish in this orchestrator pass — record each `task_id` (e.g. in
+`docs/plans/in-flight.md` per harmonize conventions), finish §9–10, and return. The harmonize master
+**§3** reconciliation merges completions into phase progress.
 
 ### 9. Recompute and write the total topological order
 
@@ -164,10 +168,13 @@ combined DAG:
 
 ## Dispatch rules
 
-- **Parallel by default** — dispatch every ready plan in the same message
+- **Parallel by default** — dispatch every ready plan in the same message; never cap batch size for
+  “quiet” runs
 - **Respect sequential parents** — dispatch only the next unstarted child, not all ready children
 - **Context in prompt** — every worker gets its plan ID and plan file path explicitly
 - **Never dispatch twice** — re-check progress status immediately before the dispatch call
+- **Non-blocking parent** — no `sleep` loops waiting on workers; nested agents run to completion
+  independently
 
 ## Reporting format
 

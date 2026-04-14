@@ -37,7 +37,7 @@ claude plugin uninstall harmonize
 
 | Skill | Purpose |
 |-------|---------|
-| `harmonize` | Master entry — serial `gh` merge-detection on plan PRs, then parallel SDLC orchestrators |
+| `harmonize` | Master entry — ordered `gh` merge-detection + post-merge chain, then parallel SDLC |
 | `harmonize-specify` | Interactive Phase 1: feature / requirement / user-story ideation |
 | `harmonize-design` | Interactive Phase 2: subsystem / interface / component / integration design |
 | `harmonize-plan` | Interactive Phase 3a: implementation plan authoring |
