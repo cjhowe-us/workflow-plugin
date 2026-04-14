@@ -111,6 +111,10 @@ Call `CronList`. Look for a job whose prompt contains `[harmonize-merge-detect]`
 7-day expiry, call `CronCreate` with the parameters documented in the `harmonize` skill's "Cron
 bootstrap" section.
 
+If `CronList` / `CronCreate` is unavailable or fails after a best effort, log a warning in the
+phase-plan event log (or stdout summary) and **continue**. Cron is optional; Step 5 merge detection
+still runs so merged PRs advance without waiting for the scheduler.
+
 ### 3. Reconcile in-flight tasks
 
 For each entry in `in-flight.md`:

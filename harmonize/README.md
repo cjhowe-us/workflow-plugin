@@ -37,7 +37,7 @@ claude plugin uninstall harmonize
 
 | Skill | Purpose |
 |-------|---------|
-| `harmonize` | Master entry point — routes SDLC work, boots cron, dispatches orchestrator |
+| `harmonize` | Master entry point — routes SDLC work, boots cron, manual merge-detect backup |
 | `harmonize-specify` | Interactive Phase 1: feature / requirement / user-story ideation |
 | `harmonize-design` | Interactive Phase 2: subsystem / interface / component / integration design |
 | `harmonize-plan` | Interactive Phase 3a: implementation plan authoring |

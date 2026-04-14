@@ -159,11 +159,13 @@ When the user invokes this skill, parse the argument and route:
 
 | Argument | Response |
 |----------|----------|
-| (none) | Print SDLC status, ask what to work on |
+| (none) | Print SDLC status, run manual merge-detection backup, ask what to work on |
 | `status` | Print SDLC status summary, do not dispatch |
 | `run` | Dispatch the `harmonize` master agent in background for a full SDLC pass |
 | `stop` | Stop all in-flight tasks, report, do not release locks |
 | `cron` | Bootstrap the merge-detection cron |
+| `merge-detect` | Dispatch `harmonize` master in `merge-detection` mode (manual merged-PR check) |
+| `merge-detection` | Same as `merge-detect` |
 | `resume <phase> <subsystem>` | After a sub-skill releases a lock, re-dispatch for that resource |
 | `specify [topic]` | `Skill(harmonize-specify, <topic>)` |
 | `design [doc-path]` | `Skill(harmonize-design, <doc-path>)` |
@@ -193,6 +195,41 @@ Every invocation of this skill:
 The cron fires every 15 minutes on off-minutes; Claude receives the prompt, the CLAUDE.md rule maps
 `/harmonize` to this skill, and the skill routes to `run` mode which dispatches the harmonize master
 agent in background.
+
+4. If `CronList` or `CronCreate` is unavailable, errors, or returns no durable job after a best
+   effort, continue — do not block the session on cron alone.
+5. In that case (and whenever the user invokes `/harmonize` with no extra argument), run the
+   **manual merge-detection backup** below so merged PRs still advance the plan graph without
+   waiting for the next cron tick.
+
+## Manual merge-detection backup
+
+Purpose: detect merged Phase 3 PRs (`gh`), advance `PLAN-*` progress, unblock dependents — same
+subset as the `merge-detection` mode on the `harmonize` master agent.
+
+### When to run
+
+- User says `/harmonize merge-detect` or `/harmonize merge-detection`
+- User says `/harmonize` with no argument (after printing status)
+- Cron bootstrap in the previous section did not confirm an active `[harmonize-merge-detect]` job
+
+#### How to run
+
+1. Prefer background dispatch:
+
+   ```text
+   Agent({
+     subagent_type: "harmonize",
+     run_in_background: true,
+     prompt: "mode: merge-detection [harmonize-merge-detect-manual] — PR merge → PLAN advance"
+   })
+   ```
+
+2. If background agents are not available, instruct the session to perform the same steps as the
+   `harmonize` master agent’s merge-detection pass (read state, delegate merge check to
+   `plan-orchestrator` per agent playbook).
+
+This pass is idempotent: repeating it should not advance status twice for the same merge.
 
 ## Completion notifications
 
