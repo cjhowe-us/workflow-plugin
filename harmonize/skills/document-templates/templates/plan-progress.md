@@ -1,5 +1,6 @@
 ---
 plan_id: PLAN-{domain}-{topic}
+pr_review_status: not_started
 status: not_started
 started_at: null
 last_updated: null

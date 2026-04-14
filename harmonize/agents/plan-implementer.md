@@ -32,8 +32,18 @@ file schemas. Also load the `workflow` skill for Phase 3 TDD details.
 
 - `plan_id` — the plan you are implementing (e.g., `PLAN-core-ecs-archetype`)
 - `plan_path` — absolute path to the plan file
+- `repo: <path>` — primary repository (**`REPO`**) on `main`; required for `git worktree` and path
+  resolution
+- `mode: resume` — optional; when present with **`status: started`**, never create a new worktree or
+  PR
 
-If either is missing from your prompt, abort and report to the orchestrator.
+If `plan_id` or `plan_path` is missing from your prompt, abort and report to the orchestrator. If
+`repo:` is missing, use `git rev-parse --show-toplevel` once and treat that as **`REPO`**.
+
+Let **`WT_ROOT`** be **`$REPO/../harmonius-worktrees`** (sibling directory of **`REPO`**). All
+**nested subagents** (`test-writer`, `implementer`) receive the **same absolute worktree path** —
+**one worktree per plan**; they must not run `git worktree add` for this branch (worktrees isolate
+subagents per plan).
 
 ## Execution flow
 
@@ -53,20 +63,19 @@ Only run this step if `status == not_started`.
 1. Ensure the worktrees directory exists:
 
    ```bash
-   mkdir -p /Users/cjhowe/Code/harmonius-worktrees
+   mkdir -p "$WT_ROOT"
    ```
 
 2. Create the worktree:
 
    ```bash
-   cd /Users/cjhowe/Code/harmonius
-   git worktree add ../harmonius-worktrees/<plan_id> -b <worktree_branch>
+   git -C "$REPO" worktree add "$WT_ROOT/<plan_id>" -b <worktree_branch>
    ```
 
 3. Work from the worktree for all subsequent commands:
 
    ```bash
-   cd /Users/cjhowe/Code/harmonius-worktrees/<plan_id>
+   cd "$WT_ROOT/<plan_id>"
    ```
 
 4. Write the PR body to a temporary file using a template like:
@@ -100,7 +109,7 @@ Only run this step if `status == not_started`.
    - `status: started`
    - `started_at: <ISO 8601 UTC now>`
    - `last_updated: <ISO 8601 UTC now>`
-   - `worktree_path: /Users/cjhowe/Code/harmonius-worktrees/<plan_id>`
+   - `worktree_path: $WT_ROOT/<plan_id>` (store the **expanded absolute path**)
    - `branch: <worktree_branch>`
    - `pr_url: <url>`
    - `pr_number: <number>`
@@ -119,14 +128,30 @@ Check off "Design documents read" in the progress file.
 
 ### 4. Resume logic
 
-If `status == started` when you begin, read the progress checklist to determine which tasks are
-already done. Resume from the first unchecked task. Do NOT re-create the worktree or the PR.
+If `status == started` when you begin (or the prompt includes **`mode: resume`**), read the progress
+checklist to determine which tasks are already done. Resume from the first unchecked task. Do
+**not** re-create the worktree or the PR.
 
-Verify the worktree still exists at `worktree_path`:
+**Discover the live worktree** (progress may be stale after IDE or host changes):
 
-```bash
-git worktree list | grep <plan_id>
-```
+1. Read **`branch`** and **`worktree_path`** from the progress file.
+
+2. List all linked worktrees from the primary repo:
+
+   ```bash
+   git -C "$REPO" worktree list
+   ```
+
+3. Prefer a row whose **path** equals **`worktree_path`**. If none match, find the row whose
+   **checked-out branch** equals **`branch`** and **adopt** that path: `cd` there for all work and
+   **update** the progress file’s **`worktree_path`** to match Git’s listing (material correction).
+
+4. If **`branch`** does not appear in `git worktree list` at all, report to the orchestrator — the
+   WIP checkout is missing; recovery needs human decision.
+
+5. Before spawning **nested** agents, re-read **`docs/plans/locks.md`**. **Stop** if any row
+   **conflicts**: **`phase: plan`** with the same **`subsystem`**, or the same **`branch`** as this
+   plan’s progress, or the same **`plan_id`** when set — the user may own that checkout.
 
 If the worktree is gone but the progress file says `started`, report to the orchestrator — recovery
 requires human decision (likely a reset of the plan).
@@ -181,6 +206,7 @@ All must pass. Check off the corresponding items in the progress file.
 Update the progress file:
 
 - `status: code_complete`
+- `pr_review_status: not_started` (explicit — `pr-reviewer` will set `complete` after review)
 - `last_updated: <ISO 8601 UTC now>`
 - Check off "Code complete marker set"
 - Append event log: `<timestamp> — code complete, awaiting review`

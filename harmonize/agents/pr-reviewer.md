@@ -30,6 +30,8 @@ progress file schema.
 
 - `plan_id` — the plan whose PR you are reviewing
 - `plan_path` — absolute path to the plan file
+- `repo: <path>` — primary repository root (**`REPO`**); required for
+  **`git -C "$REPO" worktree list`**
 
 ## Execution flow
 
@@ -43,11 +45,24 @@ progress file schema.
 
 ### 2. Change into the worktree
 
-```bash
-cd <worktree_path>
-```
+Resolve the **live** directory the same way as `plan-implementer` §4:
 
-All subsequent commands run in the worktree.
+1. Read **`worktree_path`** and **`branch`** from the progress file.
+
+2. Set **`REPO`** from a `repo:` line in your prompt if present; otherwise resolve the primary
+   checkout as
+   **`dirname "$(git -C "$worktree_path" rev-parse --path-format=absolute --git-common-dir)"`**
+   (omit `--path-format=absolute` on older Git; the result must be **`$REPO/.git`** or the common
+   git directory — take **`dirname`** once so **`REPO`** is the main working tree root).
+
+3. Run **`git -C "$REPO" worktree list`**. Prefer the row whose **path** matches
+   **`worktree_path`**; else the row whose branch matches **`branch`**. If you adopt a different
+   path, **update** the progress file’s **`worktree_path`**.
+
+4. `cd` to that path. All subsequent commands run in the worktree.
+
+**One worktree for this plan** — do not create a second worktree for the same branch; nested review
+agents must use this path only (**worktrees isolate subagents**).
 
 Sanity check:
 
@@ -114,6 +129,7 @@ gh pr ready <pr_number>
 ### 7. Update progress
 
 - `status: submitted`
+- `pr_review_status: complete`
 - `last_updated: <ISO 8601 UTC now>`
 - Check off "PR ready for human review (undrafted)"
 - Append event log: `<timestamp> — submitted for human review, N findings addressed`

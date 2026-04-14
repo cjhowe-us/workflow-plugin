@@ -26,7 +26,7 @@ file and use it as the starting point for the new document.
 | Implementation plan | `templates/implementation-plan.md` | Task breakdown driven by harmonize |
 | Plan progress | `templates/plan-progress.md` | Progress tracking for a harmonize plan |
 | Phase progress | `templates/phase-progress.md` | Per-phase rollup (specify / design / plan / release) |
-| Locks registry | `templates/locks.md` | Active coarse interactive locks |
+| Locks registry | `templates/locks.md` | Worktree claims (`branch`, path, phase, reason) |
 | In-flight registry | `templates/in-flight.md` | Running background tasks |
 | Harmonize run lock | `templates/harmonize-run-lock.md` | Serialize root `/harmonize` chains |
 | Release plan | `templates/release-plan.md` | Release checklist and rollout |

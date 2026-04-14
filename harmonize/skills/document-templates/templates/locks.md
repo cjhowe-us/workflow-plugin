@@ -2,48 +2,57 @@
 locks: []
 ---
 
-# Interactive Locks
+# Worktree locks
 
-Active coarse-grained locks on SDLC resources. The harmonize orchestrator reads this file
-before dispatching any background work and skips any resource listed here. Sub-skills add
-entries when the user engages interactively; they remove entries when the user exits.
+Each row describes **one checkout’s purpose** — typically the **branch** and **worktree path** Git
+knows about, plus a **single-line `reason`** stating what that worktree is doing right now.
 
-## Lock grain
+**Together, all rows are the lightweight snapshot of who owns which tree for what** (interactive
+sessions, explicit holds, or rare manual entries). They are **not** a full agent tree and should not
+be updated on every orchestrator tick.
 
-Locks are **coarse**: `(phase, subsystem)` pairs. One lock covers all files in a subsystem for
-a given phase, so background workers can still progress on unrelated subsystems or unrelated
-phases of the same subsystem.
+For **abandoned-work resume**, trust **`git worktree list`**, **`PLAN-*` progress** (`branch`,
+`worktree_path`, `status`), and this file — not separate agent-tree registries.
 
 ## Entry schema
 
 ```yaml
 locks:
-  - phase: specify         # specify | design | plan | review | release
-    subsystem: ai          # subsystem identifier (e.g., ai, core-runtime, rendering)
-    claimed_at: {ISO 8601 UTC timestamp}
-    owner: {sub-skill name that claimed the lock}
-    reason: {short human-readable reason}
-    session_id: {optional Claude session identifier}
+  - branch: main                    # branch checked out in this worktree (required)
+    worktree_path: /abs/path       # path from `git worktree list`; use primary repo root for main
+    phase: plan                    # specify | design | plan | review | release
+    subsystem: core-runtime        # scope — docs/plans/<subsystem>/...
+    plan_id: PLAN-core-runtime-foo # optional; set when work is for one plan
+    claimed_at: {ISO 8601 UTC}
+    owner: harmonize-plan          # sub-skill or session owner
+    reason: User stepping through ECS plan on main  # one line: what this worktree is doing
 ```
 
-## Example
+**`reason`** must stay short — it is the human-readable summary of that worktree’s job.
+
+## Examples
 
 ```yaml
 locks:
-  - phase: design
+  - branch: main
+    worktree_path: /Users/me/Code/harmonius
+    phase: plan
     subsystem: core-runtime
-    claimed_at: 2026-04-13T15:00:00Z
-    owner: harmonize-design
-    reason: User revising ECS archetype API
-  - phase: plan
-    subsystem: core-runtime
+    plan_id: null
     claimed_at: 2026-04-13T15:30:00Z
     owner: harmonize-plan
-    reason: User authoring ECS query plan
+    reason: Interactive plan authoring on primary checkout
+  - branch: plan/windowing
+    worktree_path: /Users/me/Code/harmonius-worktrees/PLAN-platform-windowing
+    phase: plan
+    subsystem: platform
+    plan_id: PLAN-platform-windowing
+    claimed_at: 2026-04-13T14:00:00Z
+    owner: user
+    reason: Manual fix in plan worktree before handing back to harmonize
 ```
 
 ## Stale locks
 
-A lock older than 24 hours with no matching phase-progress activity is considered stale.
-Harmonize reports stale locks to the user and offers to release them; it does not auto-clear
-them.
+Locks with **`claimed_at`** older than 24 hours and no matching activity in phase or plan progress
+are **stale**. Harmonize reports them; it does not auto-clear.

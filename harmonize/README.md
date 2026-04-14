@@ -142,7 +142,7 @@ Phase 4: Ship      → release-orchestrator → release-notes-author → changel
 ```
 
 The `harmonize` master agent supervises all phases and dispatches phase orchestrators as background
-tasks. Interactive sub-skills (`harmonize-specify`, `harmonize-design`,...) claim coarse locks on
+tasks. Interactive sub-skills (`harmonize-specify`, `harmonize-design`,...) claim worktree locks in
 `(phase, subsystem)` pairs so the user can give feedback at any level without the background
 orchestrator stepping on their work.
 
@@ -156,7 +156,7 @@ Per-project state lives in the Harmonius repo under `docs/plans/`:
 | `docs/plans/<subsystem>/<topic>.md` | Individual plan files |
 | `docs/plans/progress/phase-<name>.md` | Per-phase rollup progress |
 | `docs/plans/progress/PLAN-<id>.md` | Per-plan detail progress |
-| `docs/plans/locks.md` | Active coarse interactive locks |
+| `docs/plans/locks.md` | Worktree locks (branch, path, what that checkout is doing) |
 | `docs/plans/in-flight.md` | Running background tasks |
 | `docs/plans/harmonize-run-lock.md` | At most one root harmonize chain at a time |
 

@@ -12,5 +12,6 @@
         "matcher": "Write|Edit"
       }
     ]
-  }
+  },
+  "version": 1
 }

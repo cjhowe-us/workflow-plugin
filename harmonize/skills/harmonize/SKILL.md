@@ -66,8 +66,8 @@ When the user invokes **`/harmonize`** with **no** arguments, or **`/harmonize r
    - If **`TaskList` / `TaskStop` are available**: reconcile rows, then **`TaskStop`** every task
      still listed as running; then spawn **fresh** orchestrators.
    - If those APIs are **absent** (typical Cursor hosts): treat the file as **stale** after a killed
-     tree — **flush** `in_flight` to `[]`, append a **`phase-plan.md` event**, then spawn **fresh**
-     orchestrators (never assume dead `task_id` values are still stoppable).
+     tree — **flush** `in_flight` to `[]` only (no phase rollup bump for an empty flush), then spawn
+     **fresh** orchestrators (never assume dead `task_id` values are still stoppable).
 **`status`** and **`merge-detection`** do not stop running tasks; **`stop`** stops them without
 redispatch.
 
@@ -104,21 +104,30 @@ locks or duplicate dispatch.
 | Situation | Handler action |
 |-----------|----------------|
 | User killed tasks / restarted worktrees | Run **`/harmonize reset-in-flight`** (synonym: **`clear-in-flight`**) before the next **`run`**. |
-| **`reset-in-flight` / `clear-in-flight`** | Set `in_flight: []`, bump **`phase-plan.md`** `last_updated`, append an **Event log** line (UTC + reason). **No** stash gate; **no** background dispatch. |
+| **`reset-in-flight` / `clear-in-flight`** | Set `in_flight: []` only. **No** stash gate; **no** background dispatch; **no** phase rollup churn unless you are also recording a **material** incident. |
 | **`mode: run` restart sweep** | With task APIs: follow **`in-flight.md` §Reconciliation loop**. Without them: **flush** + log, then continue (same net effect as a manual reset). |
 | Sub-skill **stop-before-lock** | If **`TaskStop`** is missing, **remove** matching rows (or **flush**) instead of waiting on ghosts. |
 
 ## Worktree isolation
 
 All **specify**, **design**, and **plan TDD** PR branches are created via **`git worktree add`**
-under `../harmonius-worktrees/` so agents never **`git checkout -b`** inside the primary repo. The
-primary checkout stays on **`main`** for coordination; **`plan-implementer`** already builds
-per-plan worktrees for code.
+under **`$REPO/../harmonius-worktrees/`** (sibling of the primary checkout) so agents never
+**`git checkout -b`** inside the primary repo. The primary checkout stays on **`main`** for
+coordination.
+
+**Subagents are isolated per worktree:** each **`plan-implementer`** owns **one** directory; nested
+**`test-writer`** / **`implementer`** runs use that same path — they do not add parallel worktrees
+for the same branch.
+
+**Resume:** use **`git worktree list`**, **`PLAN-*`** (`branch`, `worktree_path`, `status`), and
+**`locks.md`**. Each lock row names a **branch**, **worktree path**, **phase**, **subsystem**, and a
+**one-line `reason`** — together they summarize who owns which checkout; background work skips on
+**conflict** (same subsystem+phase, same branch, or same `plan_id` when set).
 
 ## `/harmonize-*` sub-skills (interactive)
 
 The master **`harmonize`** skill is the default **autonomous** entry. Each **`/harmonize-<phase>`**
-command loads a **foreground** sub-skill for guided work; those skills **claim coarse locks** and
+command loads a **foreground** sub-skill for guided work; those skills **claim worktree locks** and
 may use `AskUserQuestion`. Route by argument per the table in
 [Routing on invocation](#routing-on-invocation).
 
@@ -192,11 +201,11 @@ Other phase rollups (`phase-specify.md`, …) use **`—`** in the **Plans** col
 
 ## Sub-skills per phase
 
-Each phase has an interactive sub-skill. The user loads one when they want to think through a
-specific resource; the sub-skill claims a coarse lock so background workers stay away.
+Each interactive sub-skill claims a **worktree lock** in **`locks.md`** so background workers stay
+away from that checkout and scope.
 
-| Sub-skill | For | Coarse lock type |
-|-----------|-----|------------------|
+| Sub-skill | For | Typical `phase` on lock |
+|-----------|-----|-------------------------|
 | `harmonize-specify` | Features, requirements, user stories | `specify` |
 | `harmonize-design` | Subsystem, interface, component, integration designs | `design` |
 | `harmonize-plan` | Implementation plans | `plan` |
@@ -204,33 +213,25 @@ specific resource; the sub-skill claims a coarse lock so background workers stay
 | `harmonize-review` | Draft PR review | `review` |
 | `harmonize-release` | Release process | `release` |
 
-## Coarse locks
+## Worktree locks (`docs/plans/locks.md`)
 
-A lock is a `(phase, subsystem)` pair. One lock covers ALL files in a subsystem for a given phase.
-Different phases of the same subsystem can proceed in parallel; different subsystems in the same
-phase can proceed in parallel.
+Each row is **one checkout’s claim**: **`branch`**, **`worktree_path`** (from `git worktree list`),
+**`phase`**, **`subsystem`**, optional **`plan_id`**, **`owner`**, **`claimed_at`**, and a
+**short `reason`** line stating what that worktree is doing.
 
-### Lock file (`docs/plans/locks.md`)
-
-```yaml
-locks:
-  - phase: design
-    subsystem: core-runtime
-    claimed_at: 2026-04-13T15:00:00Z
-    owner: harmonize-design
-    reason: User revising ECS archetype API
-```
+**Together, all rows describe overall hold state** (interactive or manual) — not every background
+task. Resume abandoned work from **`git worktree list`** + **`PLAN-*`**, then consult locks for
+conflicts.
 
 ### Subsystems
 
-Subsystem identifiers match the `docs/design/<subsystem>/` directory names: `ai`, `animation`,
-`audio`, `content-pipeline`, `core-runtime`, `data-systems`, `game-framework`, `geometry`, `input`,
+Subsystem identifiers match `docs/design/<subsystem>/` names: `ai`, `animation`, `audio`,
+`content-pipeline`, `core-runtime`, `data-systems`, `game-framework`, `geometry`, `input`,
 `integration`, `networking`, `physics`, `platform`, `rendering`, `simulation`, `tools`, `ui`, `vfx`.
 
 ### Stale locks
 
-A lock older than 24 hours with no matching phase-progress activity is considered stale. The
-harmonize master agent reports stale locks but never auto-clears them — the user must decide.
+Stale if **>24h** with no matching activity. Harmonize reports them; it does not auto-clear.
 
 ## Hierarchical task lists
 
@@ -261,9 +262,9 @@ lint, push, update progress).
 | `docs/plans/progress/phase-release.md` | Release history + current release PR |
 | `docs/plans/progress/PLAN-<id>.md` | Per-plan detail (Phase 3) — links to plan file + `phase-plan.md` |
 
-Phase orchestrators update their phase-progress file at the start and end of every pass.
-**`phase-plan.md`** subsystem rows must keep **Plans** links current (see
-[Progress and plan links](#progress-and-plan-links)).
+Phase orchestrators update phase-progress files **only when something material changes** (artifacts,
+PRs, counts). **`phase-plan.md`** subsystem rows must keep **Plans** links current when plans move
+(see [Progress and plan links](#progress-and-plan-links)).
 
 ## Many small PRs per phase
 
@@ -290,7 +291,7 @@ not open PRs; it commits review fixes to an existing PR.
 | `docs/plans/<subsystem>/<topic>.md` | Individual plan files | plan-author |
 | `docs/plans/progress/phase-{specify,design,plan,release}.md` | Phase rollups | Phase orchestrators |
 | `docs/plans/progress/PLAN-<id>.md` | Per-plan detail | plan-implementer, pr-reviewer |
-| `docs/plans/locks.md` | Active coarse locks | Sub-skills (claim/release), harmonize agent (report only) |
+| `docs/plans/locks.md` | Worktree claims (`branch`, path, phase, subsystem, reason) | Sub-skills (claim/release), harmonize agent (report only) |
 | `docs/plans/harmonize-run-lock.md` | One root harmonize chain at a time; live/ambiguous contention → **`AskUserQuestion`** (agent §0b) | harmonize master |
 | `docs/plans/in-flight.md` | Running background tasks | harmonize agent, phase orchestrators |
 
@@ -308,7 +309,7 @@ When the user invokes this skill, parse the argument and route:
 | `merge-detect` | Dispatch `harmonize` master in `merge-detection` mode (manual merged-PR check) |
 | `merge-detection` | Same as `merge-detect` |
 | `clear-in-flight` | Same as **`reset-in-flight`** |
-| `reset-in-flight` | Clear `docs/plans/in-flight.md` to `[]`; append **`phase-plan.md` event**; **no** dispatch; **no** stash gate |
+| `reset-in-flight` | Clear `docs/plans/in-flight.md` to `[]`; **no** dispatch; **no** stash gate; avoid extra rollup noise |
 | `resume <phase> <subsystem>` | After a sub-skill releases a lock, re-dispatch for that resource |
 | `specify [topic]` | `Skill(harmonize-specify, <topic>)` |
 | `design [doc-path]` | `Skill(harmonize-design, <doc-path>)` |
@@ -425,14 +426,15 @@ Phase 3 Plan + TDD:  42 total, 7 merged, 2 submitted, 3 code_complete, 5 started
                      25 not_started, 18 blocked by deps
 Phase 4 Release:     last 0.1.0 on 2026-03-15, no release in progress
 
-Interactive locks (2):
-  - design:core-runtime — User revising ECS archetype API (30m ago)
-  - plan:core-runtime — User stepping through ECS archetype plan (1h ago)
+Worktree locks (see docs/plans/locks.md):
+  - main @ /path/to/repo — plan:core-runtime — Interactive plan session
+  - plan/windowing @ /path/to/wt — plan:platform — Manual hold on PLAN-platform-windowing
 
-In-flight background tasks: 8
+git worktree list: (paste or summarize rows)
+
+In-flight background tasks (sparse): 8
   - feature-author (ai, task abc123, started 14:30Z)
   - plan-implementer (PLAN-platform-windowing, task def456, started 14:45Z)
-  ...
 
 Cron: active, next fire in 7 minutes
 ```

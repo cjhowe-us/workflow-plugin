@@ -95,9 +95,9 @@ Agent({
 })
 ```
 
-For each dispatched task, immediately append an entry to `docs/plans/in-flight.md` with `task_id`,
-`worker_agent`, `phase: specify`, `subsystem`, `started_at`, and `parent_task_id` (your parent task
-id from step 1).
+For each dispatched task, append **one** minimal row to `docs/plans/in-flight.md`: `task_id`,
+`worker_agent`, `phase: specify`, `subsystem`, `started_at`, `last_seen` (see `in-flight.md`
+template). Do not write agent-tree registries.
 
 ### 5. Wait for completion notifications
 
@@ -125,11 +125,15 @@ If inconsistencies are found, dispatch the appropriate worker again with a corre
 
 ### 7. Update phase progress
 
-Update `docs/plans/progress/phase-specify.md`:
+Update `docs/plans/progress/phase-specify.md` **only when** workers **materially** changed Specify
+artifacts (new files, new PRs, or completion summaries you reconciled). If this pass dispatched
+nothing and no worker finished, **do not** bump `last_updated` or append an event line.
+
+When you **do** update:
 
 - Set `last_updated` to the current UTC timestamp
-- Update subsystem rows for every subsystem touched this pass
-- Append a one-line event log entry for the pass
+- Update subsystem rows for every subsystem touched
+- Append a one-line event log entry **only for substantive events** (not idle passes)
 
 ### 8. Return
 

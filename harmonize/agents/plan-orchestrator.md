@@ -41,11 +41,11 @@ bootstrap flow. Do not act on harmonize state from memory — always load the sk
 
 | Item | Path |
 |------|------|
-| Repository | `/Users/cjhowe/Code/harmonius` |
-| Plans dir | `docs/plans/` |
-| Root plan | `docs/plans/index.md` |
-| Progress dir | `docs/plans/progress/` |
-| Worktrees dir | `../harmonius-worktrees/` |
+| Repository | **`REPO`**: `repo: <path>` from the prompt if present, else `git rev-parse --show-toplevel`. All paths below are under **`REPO`** only. |
+| Plans dir | `$REPO/docs/plans/` |
+| Root plan | `$REPO/docs/plans/index.md` |
+| Progress dir | `$REPO/docs/plans/progress/` |
+| Worktrees dir | `$REPO/../harmonius-worktrees/` |
 | GitHub CLI | `gh` (authenticated) |
 
 If any are missing, stop and report to the user.
@@ -92,6 +92,43 @@ silently fix them.
 Read every file under `docs/plans/progress/`. Match each progress file to its plan by `plan_id`.
 Warn on orphans (progress without matching plan).
 
+Read `docs/plans/locks.md` and keep it in memory for §6–8.
+
+### 4b. Scan existing worktrees (resume + isolation)
+
+**Purpose:** Background agents use **one git worktree per branch** under the worktrees root so each
+subagent works in an isolated checkout. Before dispatching, reconcile **on-disk worktrees** with
+`PLAN-*` progress and **`locks.md`**.
+
+1. Run:
+
+   ```bash
+   git -C "$REPO" worktree list
+   ```
+
+2. Build maps: **`branch → worktree path`**, and optionally **`path → branch`**.
+
+3. For each plan with **`status: started`** (WIP):
+
+   - Resolve **`subsystem`** from the implementation plan path `docs/plans/<subsystem>/...`.
+   - Let **`b`** be the progress file’s **`branch`**, **`p`** its **`worktree_path`**.
+   - **Valid resume** iff **`b`** appears in the worktree list **and** the listed path for **`b`**
+     equals **`p`** or **`p`** is empty / wrong (implementer will fix `worktree_path` on entry).
+   - If **`b`** is missing from the list, **do not** dispatch `plan-implementer` for resume — log
+     `stale WIP: no worktree for branch <b> (plan_id)`.
+   - If **`locks.md`** **conflicts** with this plan — same **`subsystem`** + **`phase: plan`**, or
+     same **`branch`** as **`b`**, or same **`plan_id`** when set — **skip** resume and new
+     dispatch.
+
+4. **Orphan worktrees:** directories under **`$REPO/../harmonius-worktrees/`** that are **not**
+   listed by `git worktree list` are **not** safe to use — warn once per pass. Entries in
+   `worktree list` whose branch is **not** referenced by any `PLAN-*` **`branch`** may be leftover
+   branches; log as informational (do not delete).
+
+5. **`pr-reviewer` lock check:** **exclude** from the review set if **`locks.md`** conflicts —
+   **`phase: review`** with matching **`subsystem`**, or matching **`branch`** / **`plan_id`** on
+   the progress file.
+
 ### 5. Merge detection (GitHub CLI)
 
 Purpose: reconcile **implementation plan** work with GitHub — every `docs/plans/progress/PLAN-*.md`
@@ -122,9 +159,13 @@ If **`merge-detection` mode** (prompt): after §5 (and §9 if you recompute `ind
 entirely — **no** `plan-implementer` / `pr-reviewer` dispatch. Return counts of merges and updated
 plans.
 
-### 6. Compute ready set
+### 6. Compute ready set and resume (WIP) set
 
-A plan is **ready** if:
+**Subsystem** for lock checks is always inferred from `docs/plans/<subsystem>/...` on the linked
+implementation plan. Skip any plan whose **`subsystem`** is blocked by **`locks.md`** for
+**`phase: plan`**.
+
+**New-work ready** — a plan is **ready** if:
 
 - `status == not_started`
 - All `dependencies` are done (merged)
@@ -132,29 +173,60 @@ A plan is **ready** if:
   - `parallel` — no sibling constraint
   - `sequential` — all previous siblings in `children` order are done
 
+**Resume ready (work in progress)** — a plan is in the **resume set** if:
+
+- `status == started`
+- §4b found a **valid** on-disk worktree for the plan’s **`branch`** (see §4b)
+- All `dependencies` are still done (merged)
+- The same parent **`execution_mode` / sibling** rules as **new-work ready** still hold
+- **`locks.md`** does **not** block **`phase: plan`** for this **`subsystem`**
+
+Dispatch **`plan-implementer`** for **both** the **ready** set and the **resume** set. Pass
+**`mode: resume`** in the prompt when `status == started` so the worker skips worktree/PR creation.
+
 ### 7. Compute review set
 
-A plan is in the **review set** if `status == code_complete`.
+A plan is in the **review set** if **`status == code_complete`**, **`pr_review_status`** is **not**
+`complete` (missing field counts as **not** complete — treat as needing review), and **`locks.md`**
+does **not** contain **`phase: review`** for the plan’s **`subsystem`**.
+
+Reconcile the worktree the same way as §4b: **`pr-reviewer`** needs the branch still checked out in
+a registered worktree; if missing, skip with a warning.
+
+This ensures **`pr-reviewer` actually runs** after implementation: `pr-reviewer` sets
+`pr_review_status: complete` when it advances the plan to **`submitted`**.
 
 ### 8. Dispatch workers in parallel
 
-For **every** plan in the ready set: spawn a `plan-implementer` via `Agent` with
-**`run_in_background: true`**, passing `plan_id` and `plan_path` in the prompt. Issue **all**
-implementer calls in **one** message — one nested background tree per plan.
+Read `docs/plans/in-flight.md` **once** after computing the ready and review sets.
 
-For **every** plan in the review set: spawn a `pr-reviewer` the same way
-(**`run_in_background: true`**), batched in that same message.
+**Ready + resume sets — `plan-implementer`:** For **every** plan in the **ready** or **resume** set,
+**skip** if `in-flight.md` already lists a **running** row with `worker_agent: plan-implementer` and
+the same **`plan_id`**. Otherwise spawn via `Agent` with **`run_in_background: true`**, passing
+`plan_id`, `plan_path`, **`repo: <REPO>`**, and **`mode: resume`** when **`status: started`**. Issue
+**all** implementer calls in **one** message — one nested background tree per **non-skipped** plan.
 
-Before each dispatch, re-read that plan’s progress file once to avoid double-spawning.
+**Review set — `pr-reviewer`:** For **every** plan in the review set, **skip** if `in-flight.md`
+already lists a **running** row with `worker_agent: pr-reviewer` and the same **`plan_id`**.
+Otherwise spawn the same way with **`run_in_background: true`**, passing **`repo: <REPO>`** so the
+reviewer can run **`git worktree list`** from the primary checkout.
 
-**Do not** wait for workers to finish in this orchestrator pass — record each `task_id` (e.g. in
-`docs/plans/in-flight.md` per harmonize conventions), finish §9–10, and return. The harmonize master
-**§3** reconciliation merges completions into phase progress.
+Before **each** dispatch, re-read that plan’s progress file once (status and `pr_review_status` may
+have changed).
+
+After **each** `Agent` return, append **`in-flight.md`** per harmonize master **§7a** (minimal
+schema only).
+
+**Do not** wait for workers to finish in this orchestrator pass — record each `task_id`, finish
+§9–10, and return. The harmonize master **§3** reconciliation merges completions into phase progress
+**only on material changes** (master §8).
 
 ### 9. Recompute and write the total topological order
 
-Update `docs/plans/index.md` with the recomputed total order. This is the authoritative ordering for
-humans to read and track progress.
+- If **§5 merge detection ran** in this invocation (**`merge-detection`** or full **`run`** after
+  merges were processed), recompute and write `docs/plans/index.md`.
+- If the prompt is **`dispatch-only`** (§5 skipped), **do not** rewrite `index.md` in this pass —
+  nothing in §5–8 should change the DAG.
 
 ### 10. Report summary
 
@@ -205,7 +277,8 @@ Running the orchestrator twice back-to-back must be safe:
 
 - Re-read every progress file (state may have changed between runs)
 - Never advance a plan's status forward — only workers do that
-- Never dispatch a plan that already has status != not_started
+- Never dispatch **`plan-implementer`** for **`submitted`**, merged, or archived plans; **do**
+  dispatch for **`started`** when §4b validates the worktree and locks allow it (resume)
 
 ## Error handling
 

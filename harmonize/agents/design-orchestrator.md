@@ -84,9 +84,9 @@ section B).
 
 ### 5. Dispatch workers in parallel
 
-Batch all worker dispatches in one message to maximize parallelism. Write each task_id to
-`docs/plans/in-flight.md` immediately after dispatch with `phase: design` and the target
-`subsystem`.
+Batch all worker dispatches in one message to maximize parallelism. After each dispatch, append
+**one** minimal row to `docs/plans/in-flight.md` (`task_id`, `worker_agent`, `phase: design`,
+`subsystem`, `started_at`, `last_seen`).
 
 ### 6. Wait for completion notifications
 
@@ -94,7 +94,8 @@ For each completion:
 
 1. `TaskOutput(task_id)` to read the summary
 2. Parse files written, PR opened, review findings, next-step suggestion
-3. Update `docs/plans/progress/phase-design.md`:
+3. Update `docs/plans/progress/phase-design.md` **only for material outcomes** (files written, PR
+   opened, review state changed):
    - Set subsystem status: `in_progress` → `review` → `done`
    - Add PR numbers to the Open PRs column
    - Append event log
