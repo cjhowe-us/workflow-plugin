@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Claude Code SubagentStop: prune running_tasks in the *primary* repo only.
+# Claude Code SubagentStop + WorktreeRemove: prune running_tasks in the *primary* repo only.
+# WorktreeRemove fires when an isolated worktree session ends (see hooks docs); roster entries
+# keyed by worktree_path are dropped so state stays correct if SubagentStop is missed.
 set -euo pipefail
 
 INPUT=$(cat)
@@ -35,17 +37,7 @@ mkdir -p "$ROOT/docs/plans"
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-TASK_ID=$(echo "$INPUT" | jq -r '
-  [
-    .agent_id, .taskId, .task_id, .id, .subagentTaskId, .subagent_task_id,
-    .task.taskId, .task.task_id, .task.id,
-    .subagent.taskId, .subagent.task_id, .subagent.id
-  ]
-  | map(select(. != null))
-  | map(tostring)
-  | map(select(length > 0))
-  | .[0] // empty
-')
+HOOK_EVENT=$(echo "$INPUT" | jq -r '.hook_event_name // empty')
 
 DEFAULT='{"last_subagent_start":null,"last_subagent_stop":null,"running_tasks":[],"updated_at":null,"workspace":null}'
 
@@ -58,6 +50,56 @@ else
 fi
 
 TMP="${FILE}.tmp.$$"
+
+if [[ "$HOOK_EVENT" == "WorktreeRemove" ]]; then
+  WT_RAW=$(echo "$INPUT" | jq -r '.worktree_path // empty')
+  [[ -n "$WT_RAW" ]] || exit 0
+  if [[ -d "$WT_RAW" ]]; then
+    WT_NORM=$(cd "$WT_RAW" && pwd)
+  else
+    WT_NORM="$WT_RAW"
+  fi
+  WT_NORM="${WT_NORM%/}"
+  if echo "$BASE" | jq -S \
+    --arg wt "$WT_NORM" \
+    --arg now "$NOW" \
+    --arg ws "$ROOT" \
+    '
+ def striptrail: sub("/$"; "");
+    .running_tasks |= map(select(
+      ((.worktree_path // "") | striptrail) != ($wt | striptrail)
+    ))
+    | .last_subagent_stop = {
+        agent_id: null,
+        status: "worktree_removed",
+        stopped_at: $now,
+        task_id: null,
+        worktree_path: $wt
+      }
+    | .updated_at = $now
+    | .workspace = $ws
+    ' >"$TMP"
+  then
+    mv "$TMP" "$FILE"
+  else
+    rm -f "$TMP"
+    exit 0
+  fi
+  exit 0
+fi
+
+TASK_ID=$(echo "$INPUT" | jq -r '
+  [
+    .agent_id, .taskId, .task_id, .id, .subagentTaskId, .subagent_task_id,
+    .task.taskId, .task.task_id, .task.id,
+    .subagent.taskId, .subagent.task_id, .subagent.id
+  ]
+  | map(select(. != null))
+  | map(tostring)
+  | map(select(length > 0))
+  | .[0] // empty
+')
+
 if echo "$BASE" | jq -S \
   --arg tid "$TASK_ID" \
   --arg now "$NOW" \

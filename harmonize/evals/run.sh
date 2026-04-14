@@ -177,8 +177,11 @@ check_hook_script() {
 
 # --- hooks.json suite ---------------------------------------------------------
 
+# resolve_mode: plugin = Claude ${CLAUDE_PLUGIN_ROOT} (parent of hooks/);
+#               cursor_plugin = Cursor plugin root (parent of hooks/), commands ./...
 check_hooks_json() {
   local hooks_json="$1"
+  local resolve_mode="${2:-plugin}"
   local rel="${hooks_json#"$WORKFLOW_DIR"/}"
   printf '\n[hooks.json] %s\n' "$rel"
 
@@ -192,13 +195,35 @@ check_hooks_json() {
   fi
   pass "$rel: valid JSON"
 
-  if [ "$(q '.hooks_json.require_commands_resolve')" = "true" ]; then
-    local plugin_dir cmds missing=0
+  local require_resolve="false"
+  if [ "$resolve_mode" = "cursor_plugin" ]; then
+    [ "$(q '.hooks_json_cursor_plugins.require_commands_resolve')" = "true" ] && require_resolve="true"
+  else
+    [ "$(q '.hooks_json.require_commands_resolve')" = "true" ] && require_resolve="true"
+  fi
+
+  if [ "$require_resolve" = "true" ]; then
+    local plugin_dir cmds missing=0 resolved
     plugin_dir="$(cd "$(dirname "$hooks_json")/.." && pwd)"
     cmds="$(jq -r '.. | .command? // empty' "$hooks_json" 2>/dev/null)"
     while IFS= read -r cmd; do
       [ -z "$cmd" ] && continue
-      local resolved="${cmd//\$\{CLAUDE_PLUGIN_ROOT\}/$plugin_dir}"
+      if [ "$resolve_mode" = "cursor_plugin" ]; then
+        if [[ "$cmd" == *'${'* ]]; then
+          fail "$rel: use paths relative to plugin root (./...), not: $cmd"
+          missing=$((missing + 1))
+          continue
+        fi
+        if [[ "$cmd" == /* ]]; then
+          resolved="$cmd"
+        elif [[ "$cmd" == ./* ]]; then
+          resolved="${plugin_dir}/${cmd#./}"
+        else
+          resolved="${plugin_dir}/$cmd"
+        fi
+      else
+        resolved="${cmd//\$\{CLAUDE_PLUGIN_ROOT\}/$plugin_dir}"
+      fi
       if [ ! -f "$resolved" ]; then
         fail "$rel: command not found: $cmd"
         missing=$((missing + 1))
@@ -254,11 +279,17 @@ while IFS= read -r f; do
   check_hook_script "$f"
 done < <(expand_globs '.hook_scripts.globs')
 
-printf '\n-- hooks.json --\n'
+printf '\n-- hooks.json (Claude plugins) --\n'
 while IFS= read -r f; do
   [ -z "$f" ] && continue
-  check_hooks_json "$WORKFLOW_DIR/$f"
+  check_hooks_json "$WORKFLOW_DIR/$f" plugin
 done < <(q_array '.hooks_json.files')
+
+printf '\n-- hooks.json (Cursor plugins) --\n'
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  check_hooks_json "$WORKFLOW_DIR/$f" cursor_plugin
+done < <(q_array '.hooks_json_cursor_plugins.files')
 
 printf '\n-- plugin manifests --\n'
 while IFS= read -r f; do

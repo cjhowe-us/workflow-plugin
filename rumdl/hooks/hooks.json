@@ -1,15 +1,16 @@
 {
+  "version": 1,
   "hooks": {
     "PostToolUse": [
       {
+        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/fmt-markdown.sh",
             "timeout": 30,
             "type": "command"
           }
-        ],
-        "matcher": "Write|Edit"
+        ]
       }
     ]
   }

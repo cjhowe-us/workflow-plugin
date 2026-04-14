@@ -30,6 +30,14 @@ hooks_json:
     - "rumdl/hooks/hooks.json"
   require_commands_resolve: true
 
+# Cursor plugin hooks: camelCase events, commands relative to each plugin root
+# (see https://cursor.com/docs/reference/plugins — manifest "hooks" overrides hooks/hooks.json discovery).
+hooks_json_cursor_plugins:
+  files:
+    - "harmonize/hooks/hooks.cursor.json"
+    - "rumdl/hooks/hooks.cursor.json"
+  require_commands_resolve: true
+
 plugin_manifests:
   files:
     - "harmonize/.claude-plugin/plugin.json"

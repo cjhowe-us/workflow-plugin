@@ -4,6 +4,7 @@
     "name": "Christian Howe"
   },
   "description": "Hierarchical development workflow with coding standards, document templates, and supervisor agents for the full ideate-design-implement-release lifecycle. Requires the rumdl plugin for Markdown linting and auto-formatting.",
+  "hooks": "./hooks/hooks.cursor.json",
   "homepage": "https://github.com/cjhowe-us/workflow",
   "keywords": [
     "coding-standards",
@@ -18,5 +19,5 @@
   "license": "Apache-2.0",
   "name": "harmonize",
   "repository": "https://github.com/cjhowe-us/workflow",
-  "version": "2.0.20"
+  "version": "2.0.21"
 }

@@ -2,28 +2,47 @@
   "hooks": {
     "PostToolUse": [
       {
+        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/check-config.sh",
             "timeout": 30,
             "type": "command"
           }
-        ],
-        "matcher": "Write|Edit"
+        ]
       }
     ],
     "SubagentStart": [
       {
-        "command": "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start-worktree-state.sh",
-        "timeout": 30,
-        "type": "command"
+        "hooks": [
+          {
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start-worktree-state.sh",
+            "timeout": 30,
+            "type": "command"
+          }
+        ]
       }
     ],
     "SubagentStop": [
       {
-        "command": "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop-worktree-state.sh",
-        "timeout": 30,
-        "type": "command"
+        "hooks": [
+          {
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop-worktree-state.sh",
+            "timeout": 30,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop-worktree-state.sh",
+            "timeout": 30,
+            "type": "command"
+          }
+        ]
       }
     ]
   },

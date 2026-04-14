@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "postToolUse": [
+      {
+        "command": "./hooks/fmt-markdown.sh",
+        "matcher": "Write|Edit|MultiEdit",
+        "timeout": 30,
+        "type": "command"
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "hooks": {
+    "postToolUse": [
+      {
+        "command": "./hooks/check-config.sh",
+        "matcher": "Write|Edit|MultiEdit",
+        "timeout": 30,
+        "type": "command"
+      }
+    ],
+    "subagentStart": [
+      {
+        "command": "./hooks/subagent-start-worktree-state.sh",
+        "timeout": 30,
+        "type": "command"
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": "./hooks/subagent-stop-worktree-state.sh",
+        "timeout": 30,
+        "type": "command"
+      }
+    ]
+  }
+}
