@@ -17,6 +17,12 @@ progress_file: docs/plans/progress/PLAN-{domain}-{topic}.md
 
 # {Plan Name} Implementation Plan
 
+## SDLC links
+
+- **Progress:** [../progress/PLAN-{domain}-{topic}.md](../progress/PLAN-{domain}-{topic}.md)
+- **Phase rollup:** [../progress/phase-plan.md](../progress/phase-plan.md)
+- **Plan index:** [../index.md](../index.md)
+
 > **Plan ID:** `PLAN-{domain}-{topic}`
 >
 > **Instructions for agents working on this plan:** Before any action, load the `harmonize` skill

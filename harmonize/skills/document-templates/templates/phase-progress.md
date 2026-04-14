@@ -19,9 +19,15 @@ Use one instance of this template per phase:
 
 ## Subsystems
 
-| Subsystem | Status | Artifacts | Open PRs | Last update |
-|-----------|--------|-----------|----------|-------------|
-| {name} | {not_started / in_progress / review / done} | {counts} | {#num, #num} | {timestamp} |
+| Subsystem | Status | Artifacts | Plans | Open PRs | Last update |
+|-----------|--------|-----------|-------|----------|-------------|
+| {name} | {not_started / in_progress / review / done} | {counts} | {links or —} | {#num, #num} | {timestamp} |
+
+**Plans column:** markdown link(s) to `docs/plans/<subsystem>/<topic>.md` for this subsystem. Use
+**`—`** in `phase-specify.md`, `phase-design.md`, and `phase-release.md`. In **`phase-plan.md`**,
+every subsystem with implementation work **must** list each plan file
+(e.g. `[ecs.md](../core-runtime/ecs.md)`). Optionally add the matching per-plan progress file in
+the same cell (e.g. · [`PLAN-…`](PLAN-core-runtime-ecs.md)).
 
 Status values:
 

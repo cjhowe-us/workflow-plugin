@@ -4,7 +4,7 @@ description: >
   Full SDLC orchestration for Harmonius. Entry point for every stage of the software
   development lifecycle: feature/requirement/user-story ideation, hierarchical design, design
   review, implementation planning, hierarchical TDD execution, PR review, and release.
-  Requires plans to link to design docs and design docs to trace F/R/US.
+  Requires plans to link to design docs and design docs to trace F/R/US; progress files link to plans.
   Default run restarts in-flight background tasks before the dispatch wave.
   A bare /harmonize immediately dispatches the harmonize master agent in the background (no
   approval, no “what next?” prompt). The master chains merge-detection and a post-merge continuation
@@ -154,6 +154,18 @@ implementation.
 **Forbidden:** plans with no design linkage, designs with no specify linkage, or mismatched ID sets
 between plan front matter and the linked design docs.
 
+## Progress and plan links
+
+Rollups and per-plan progress must stay **bidirectionally navigable**:
+
+| File | Must link to |
+|------|--------------|
+| `docs/plans/progress/PLAN-<id>.md` | Its implementation plan `docs/plans/<subsystem>/<topic>.md`, **`phase-plan.md`**, and **`index.md`** (see `plan-progress` template). |
+| `docs/plans/<subsystem>/<topic>.md` (implementation plan) | **`../progress/PLAN-<id>.md`**, **`phase-plan.md`**, **`index.md`** (see `implementation-plan` template). |
+| `docs/plans/progress/phase-plan.md` | **Plans** column: each active subsystem lists markdown link(s) to every tracked implementation plan file (and may cite matching `PLAN-*.md`). |
+
+Other phase rollups (`phase-specify.md`, …) use **`—`** in the **Plans** column per template.
+
 ## Sub-skills per phase
 
 Each phase has an interactive sub-skill. The user loads one when they want to think through a
@@ -223,9 +235,11 @@ lint, push, update progress).
 | `docs/plans/progress/phase-design.md` | Per-subsystem design doc + review status + PRs |
 | `docs/plans/progress/phase-plan.md` | Per-subsystem plan-authoring + execution rollup + PRs |
 | `docs/plans/progress/phase-release.md` | Release history + current release PR |
-| `docs/plans/progress/PLAN-<id>.md` | Existing per-plan detail (Phase 3 workers) |
+| `docs/plans/progress/PLAN-<id>.md` | Per-plan detail (Phase 3) — links to plan file + `phase-plan.md` |
 
 Phase orchestrators update their phase-progress file at the start and end of every pass.
+**`phase-plan.md`** subsystem rows must keep **Plans** links current (see
+[Progress and plan links](#progress-and-plan-links)).
 
 ## Many small PRs per phase
 

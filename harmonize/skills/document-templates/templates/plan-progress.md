@@ -11,7 +11,13 @@ pr_number: null
 
 # Progress: {Plan Name}
 
-Plan file: [../{subsystem}/{topic}.md](../{subsystem}/{topic}.md)
+## Cross-links (required)
+
+| Artifact | Link |
+|----------|------|
+| Implementation plan | [../{subsystem}/{topic}.md](../{subsystem}/{topic}.md) |
+| Phase plan rollup | [phase-plan.md](phase-plan.md) |
+| Plan tree index | [../index.md](../index.md) |
 
 ## Checklist
 
