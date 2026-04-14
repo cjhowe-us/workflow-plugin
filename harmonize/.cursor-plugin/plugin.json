@@ -5,7 +5,7 @@
   },
   "description": "Hierarchical development workflow with coding standards, document templates, and supervisor agents for the full ideate-design-implement-release lifecycle. Requires the rumdl plugin for Markdown linting and auto-formatting.",
   "homepage": "https://github.com/cjhowe-us/workflow",
-  "hooks": "../hooks/hooks.cursor.json",
+  "hooks": "hooks/hooks.cursor.json",
   "keywords": [
     "coding-standards",
     "document-templates",

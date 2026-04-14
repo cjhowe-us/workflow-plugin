@@ -4,7 +4,7 @@
     "email": "cjhowe@users.noreply.github.com"
   },
   "description": "Markdown linting and formatting via rumdl: PostToolUse hook that runs rumdl fmt after Markdown edits, and the Markdown coding-standard skill.",
-  "hooks": "../hooks/hooks.cursor.json",
+  "hooks": "hooks/hooks.cursor.json",
   "homepage": "https://github.com/cjhowe-us/workflow",
   "keywords": [
     "formatter",

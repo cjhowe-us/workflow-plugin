@@ -1,8 +1,0 @@
-# Merge into your repo’s root .gitignore so each developer keeps independent Harmonize state
-# under the primary checkout (docs/plans/). Durable SDLC progress stays in normal git commits
-# (features, designs, plans, PLAN-* progress); these files are only for live coordination on
-# this machine.
-docs/plans/harmonize-run-lock.md
-docs/plans/in-flight.md
-docs/plans/locks.md
-docs/plans/worktree-state.json

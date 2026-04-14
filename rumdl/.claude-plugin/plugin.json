@@ -4,6 +4,7 @@
     "url": "https://github.com/cjhowe-us"
   },
   "description": "Markdown linting and formatting via rumdl: LSP server for live diagnostics, PostToolUse hook that runs `rumdl fmt` after every Markdown edit, and the Markdown coding-standard skill.",
+  "hooks": "./hooks/hooks.json",
   "keywords": [
     "formatter",
     "gfm",
