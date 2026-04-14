@@ -16,7 +16,7 @@
       "category": "development",
       "description": "Markdown linting and formatting via rumdl: hooks and the markdown coding-standard skill.",
       "name": "rumdl",
-      "source": "./rumdl",
+      "source": "rumdl",
       "tags": [
         "formatter",
         "gfm",
@@ -33,7 +33,7 @@
       "category": "development",
       "description": "Development workflow with coding standards, document templates, and supervisor agents for the full ideate-design-implement-release lifecycle. Depends on the rumdl plugin.",
       "name": "harmonize",
-      "source": "./harmonize",
+      "source": "harmonize",
       "tags": [
         "coding-standards",
         "document-templates",
