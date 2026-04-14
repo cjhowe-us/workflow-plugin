@@ -37,7 +37,7 @@ claude plugin uninstall harmonize
 
 | Skill | Purpose |
 |-------|---------|
-| `harmonize` | Master entry point — topological `run`, cron, optional merge-detect backup |
+| `harmonize` | Master entry — `/harmonize` immediately backgrounds full `run` (no approval); parallel phase orchestrators |
 | `harmonize-specify` | Interactive Phase 1: feature / requirement / user-story ideation |
 | `harmonize-design` | Interactive Phase 2: subsystem / interface / component / integration design |
 | `harmonize-plan` | Interactive Phase 3a: implementation plan authoring |

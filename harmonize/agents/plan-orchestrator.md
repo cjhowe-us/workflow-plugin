@@ -199,6 +199,8 @@ Running the orchestrator twice back-to-back must be safe:
 
 ## Never do
 
+- Use `AskUserQuestion` in **`run`**, **`merge-detection`**, or **`dispatch-only`** — fully
+  automated; on ambiguity log a warning and skip the affected plan, never block on user input
 - Merge a PR (humans merge)
 - Write code to a worktree (workers do that)
 - Modify the implementation-plan template (it is the source of truth)

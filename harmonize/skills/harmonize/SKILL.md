@@ -4,11 +4,12 @@ description: >
   Full SDLC orchestration for Harmonius. Entry point for every stage of the software
   development lifecycle: feature/requirement/user-story ideation, hierarchical design, design
   review, implementation planning, hierarchical TDD execution, PR review, and release.
-  A bare /harmonize dispatches a full run that continues incomplete work in topological order.
-  Routes user intent to phase-specific sub-skills for interactive work while a background
-  supervisor runs the orchestration tree asynchronously and opens many small draft PRs for
-  human review. Use whenever the user wants to plan, design, implement, review, release, or
-  check status of anything in Harmonius, or whenever "harmonize" is mentioned.
+  A bare /harmonize immediately dispatches the harmonize master agent in the background (no
+  approval, no “what next?” prompt) so unblocked work starts at once in parallel subtrees,
+  respecting topological order. Routes user intent to phase-specific sub-skills for interactive
+  work while a background supervisor runs the orchestration tree asynchronously and opens many
+  small draft PRs for human review. Use whenever the user wants to plan, design, implement,
+  review, release, or check status of anything in Harmonius, or whenever "harmonize" is mentioned.
 ---
 
 # Harmonize
@@ -23,12 +24,35 @@ readable.
 
 | Channel | What runs | User sees |
 |---------|-----------|-----------|
-| Foreground (this conversation) | `harmonize` + sub-skills + AskUserQuestion | Interactive decisions |
+| Foreground (this conversation) | Slash-command routing, `status`, interactive **sub-skills** only | Brief ack on `/harmonize`; questions only inside sub-skills |
 | Background (`Agent(run_in_background: true)`) | master agent, phase orchestrators, workers | Progress notifications, PRs |
 
 The main conversation stays responsive because every heavy agent runs as a background task. State
 persists to files, so the user can step away and come back. When a background task completes, the
 foreground session receives a completion notification.
+
+## Non-negotiable: default `/harmonize` (run) behavior
+
+When the user invokes **`/harmonize`** with **no** arguments, or **`/harmonize run`**, the handler
+**must** start work **immediately** — this is the core product behavior.
+
+1. **No approval gate** — do **not** call `AskUserQuestion`, do **not** ask which plan or subsystem
+   to prioritize, do **not** wait for the user to confirm a “go” after printing status.
+2. **No foreground blocking** — do **not** run `CronList` / `CronCreate` in the foreground before
+   dispatch. The **harmonize** master agent performs cron bootstrap in the background per its
+   playbook.
+3. **First tool batch** — in the **same** assistant turn as loading this skill (or immediately
+   after, with no user round-trip), call `Agent` with `subagent_type: "harmonize"`,
+   `run_in_background: true`, and a prompt that begins with `mode: run` plus the repo path. You may
+   add a one-line user-facing ack (“Dispatched harmonize run in background.”) **without** waiting
+   for a reply.
+4. **Parallelism** — the master agent fans out **all** independent orchestrators and workers in
+   **topological waves** (dependency-respecting). Within each wave, it issues **multiple** `Agent`
+   calls in **one** message. Never serialize orchestrator dispatches “one phase at a time” when more
+   than one phase has ready work.
+
+Use **`/harmonize status`** (or `status` argument) only when the user wants a read-only summary with
+**no** background dispatch.
 
 ## The user never edits directly
 
@@ -184,9 +208,13 @@ A bare `/harmonize` (no argument) must **not** stop at status-only or merge-dete
 the `harmonize` master agent in background with default mode `run` so it:
 
 1. Reconciles state, runs merge detection, and computes each phase’s ready set
-2. Dispatches phase orchestrators for all ready work, respecting phase order **1 → 2 → 3** (Phase 4
-   only on explicit user request)
-3. Within Phase 3, honors **dependency order** in `docs/plans/index.md` — only plans whose
+2. Dispatches **every** phase orchestrator that has ready work **in one parallel batch** (same
+   message, multiple `Agent` calls). **Per-topic** ordering stays **Specify → Design → Plan → TDD**;
+   **across subsystems and independent topics**, phases run **concurrently**.
+3. Phase **3** `plan-orchestrator` receives a prompt that includes **merge detection plus** dispatch
+   so PR merges unblock dependents in the same pass without waiting for a second orchestrator
+   invocation.
+4. Within Phase 3, honors **dependency order** in `docs/plans/index.md` — only plans whose
    prerequisites are merged / satisfied advance; `plan-orchestrator` owns the ready set
 
 Foreground may print a one-line acknowledgment; the master agent returns the full summary when the
@@ -194,11 +222,17 @@ pass completes.
 
 ## Cron bootstrap
 
-Every invocation of this skill:
+**Background only** — the **harmonize** master agent performs cron bootstrap on every `mode: run`
+pass (see agent playbook). That keeps `/harmonize` from stalling in the foreground.
 
-1. Call `CronList`
-2. Look for a job whose prompt contains `[harmonize-merge-detect]`
-3. If missing or near 7-day expiry, call `CronCreate` with:
+Foreground handlers:
+
+- **`/harmonize` / `run`** — dispatch the master agent **first**; do **not** await cron here.
+- **`/harmonize cron`** — may call `CronList` / `CronCreate` directly for manual setup.
+- **`status`** — optional read-only cron note only if already known from context; never block
+  dispatch.
+
+Cron parameters (for the master agent or `cron` argument):
 
 | Parameter | Value |
 |-----------|-------|
@@ -211,11 +245,8 @@ The cron fires every 15 minutes on off-minutes; Claude receives the prompt, the 
 `/harmonize` to this skill, and the skill routes to `run` mode which dispatches the harmonize master
 agent in background.
 
-4. If `CronList` or `CronCreate` is unavailable, errors, or returns no durable job after a best
-   effort, continue — do not block the session on cron alone.
-5. If cron could not be confirmed, note it in the session summary. A full `run` pass (including bare
-   `/harmonize`) still performs merge detection in the master agent; optionally also run the
-   **manual merge-detection backup** below when the user cannot dispatch a full pass.
+If `CronList` or `CronCreate` is unavailable in the master agent, it logs and continues — merge
+detection still runs inside `plan-orchestrator` for that pass.
 
 ## Manual merge-detection backup
 

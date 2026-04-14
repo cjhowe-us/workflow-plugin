@@ -37,6 +37,17 @@ plan, TDD, review, and release across every subsystem. Dispatches phase orchestr
 tasks; persists state to files; reconciles completion notifications; respects coarse interactive
 locks.
 
+## Autonomous `run` mode (no approval)
+
+In **`mode: run`** (including bare `/harmonize`), **never** call `AskUserQuestion` for planning,
+prioritization, or “should I proceed?”. Start work immediately. Only escalate interactively for
+**unrecoverable** blocks (e.g. `gh` not authenticated, corrupted state file, dependency cycle) where
+no safe automated action exists.
+
+If the repo has uncommitted changes on `main`, **append a warning** to the relevant phase-progress
+event log and **continue** dispatching all work that does not require a clean tree — do not halt the
+run waiting for the user to stash.
+
 ## Load the harmonize skill first
 
 Before any other action, call `Skill(harmonize)` to load the operational playbook. Do not act from
@@ -64,7 +75,7 @@ Parse the prompt for a mode keyword. Default is `run`.
 
 | Mode | Behavior |
 |------|----------|
-| `run` | Full cycle: reconcile, merge-detect, enforce locks, dispatch all ready work in **topological order** (phase 1→2→3; Phase 3 follows `docs/plans/index.md` deps via ready set) |
+| `run` | Full cycle: reconcile, enforce locks, **one parallel wave** of phase orchestrators; Phase 3 always runs `plan-orchestrator` (merge-detect + dispatch); Phases 1–3 fan out together when each has ready work |
 | `status` | Read state, print summary, do not dispatch |
 | `stop` | Stop every in-flight task, keep locks, report |
 | `merge-detection` | Check only submitted PRs for merges, advance merged, dispatch unblocked |
@@ -112,8 +123,8 @@ Call `CronList`. Look for a job whose prompt contains `[harmonize-merge-detect]`
 bootstrap" section.
 
 If `CronList` / `CronCreate` is unavailable or fails after a best effort, log a warning in the
-phase-plan event log (or stdout summary) and **continue**. Cron is optional; Step 5 merge detection
-still runs so merged PRs advance without waiting for the scheduler.
+phase-plan event log (or stdout summary) and **continue**. Cron is optional; the `plan-orchestrator`
+dispatch still performs merge detection so PRs advance without the scheduler.
 
 ### 3. Reconcile in-flight tasks
 
@@ -138,18 +149,15 @@ For each entry in `locks.md`:
 
 Under NO circumstances dispatch new work on a locked `(phase, subsystem)` pair.
 
-### 5. Merge detection (Phase 3)
+### 5. Compute the phase ready set
 
-Delegate to `plan-orchestrator` by dispatching it with the `merge-detection` prompt. It will check
-submitted PRs via `gh pr view`, advance merged plans, archive progress files, and unblock dependents
-— all within Phase 3.
+**Per topic**, readiness follows **Specify → Design → Plan → TDD/Review**.
+**Across different subsystems and independent topics**, compute ready sets **in parallel** — do not
+wait for all of Phase 1 to finish globally before starting Phase 2 elsewhere.
 
-### 6. Compute the phase ready set
-
-Process phases in order **1 → 2 → 3** when interpreting readiness (Specify before Design before Plan
-before TDD/Review for the same topic). For Phase 3 plans, the ready set must respect
-**dependency order** in `docs/plans/index.md`: only plans whose prerequisites are merged or
-satisfied may appear as ready; `plan-orchestrator` computes that set.
+For Phase 3 plans, the ready set must respect **dependency order** in `docs/plans/index.md`: only
+plans whose prerequisites are merged or satisfied may appear as ready; `plan-orchestrator` computes
+that set internally.
 
 For each phase, compute which subsystems are ready to advance:
 
@@ -164,18 +172,45 @@ For each phase, compute which subsystems are ready to advance:
 
 Subtract any subsystem with an active lock for that phase. Never auto-dispatch `release`.
 
-### 7. Dispatch phase orchestrators
+### 6. Dispatch phase orchestrators (one parallel wave)
 
-For each phase with ready work, dispatch its orchestrator as a background task. Prefer dispatch
-order that matches **topological continuation**: phase order first, then subsystem / plan order
-consistent with `docs/plans/index.md` for Phase 3. Dispatch in parallel via multiple `Agent` calls
-in one message when independent:
+Issue **all** orchestrator dispatches for this pass in **one** assistant message — **never** await
+one orchestrator’s completion before starting another when each has work or when Phase 3 needs merge
+detection.
+
+Before each `Agent` call, check `in-flight.md`: if that orchestrator is **already** running for this
+phase (same `worker_agent`, task not completed), **skip** spawning a duplicate.
+
+**Always** include **exactly one** `plan-orchestrator` dispatch per `run` pass so merged PRs unblock
+dependents even if the ready set is empty. Its prompt must include **both** merge detection and
+worker dispatch, e.g.:
+
+```text
+mode: run — merge-detection then dispatch ready + review sets per plan-orchestrator playbook
+```
+
+**Additionally**, if Phase 1 has ready subsystems, dispatch `specify-orchestrator` in the same
+message. If Phase 2 has ready subsystems, dispatch `design-orchestrator` in the same message.
+
+Example batch (adjust lists to computed ready sets):
 
 ```text
 Agent({
+  description: "Phase 3 plan pass (merge + dispatch)",
+  subagent_type: "plan-orchestrator",
+  prompt: "mode: run — merge-detection then dispatch ready + review",
+  run_in_background: true
+})
+Agent({
+  description: "Phase 1 specify pass",
+  subagent_type: "specify-orchestrator",
+  prompt: "run pass for ready subsystems: ai, platform",
+  run_in_background: true
+})
+Agent({
   description: "Phase 2 design pass",
   subagent_type: "design-orchestrator",
-  prompt: "run pass for ready subsystems: core-runtime, rendering, ai",
+  prompt: "run pass for ready subsystems: core-runtime, rendering",
   run_in_background: true
 })
 ```
@@ -183,7 +218,7 @@ Agent({
 Immediately after each dispatch returns, write the task_id to `in-flight.md` with `phase`,
 `subsystem`, `worker_agent`, `started_at`, and `parent_task_id` (this agent's parent task id).
 
-### 8. Write phase-progress updates
+### 7. Write phase-progress updates
 
 Update each per-phase progress file:
 
@@ -191,7 +226,7 @@ Update each per-phase progress file:
 - Append an event log entry for this pass
 - Update subsystem rows where counts changed
 
-### 9. Report summary
+### 8. Report summary
 
 Return the SDLC status summary format defined in the `harmonize` skill. Complete the parent task for
 this pass.
@@ -207,7 +242,7 @@ this pass.
 | `gh` not authenticated | Stop, ask user to run `gh auth login` |
 | Lock cycle detected | Report to user, pick earlier claim |
 | Stale lock | Report only, do not auto-clear |
-| Uncommitted changes on main | Stop, ask user to commit or stash |
+| Uncommitted changes on main | Log warning to phase-progress, **continue** dispatch |
 
 ## Idempotency
 
