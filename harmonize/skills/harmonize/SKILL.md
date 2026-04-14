@@ -90,6 +90,14 @@ Before **`run`**, **`merge-detection`**, **`dispatch-only`**, or **`resume`**, t
 - `HEAD` on **`main`**
 - **`git status --porcelain`** empty in the primary Harmonius checkout
 
+**`REPO` for this gate** must be that **primary** tree (**`dirname`** of **`git-common-dir`**), not
+the current linked worktree path — otherwise **`HEAD`** and dirty state reflect a worker branch and
+the gate **false-fails**. Orchestrator playbooks resolve **`REPO`** accordingly; see
+**`plan-orchestrator`** **Resolve `REPO`**.
+
+**`SubagentStart` / `SubagentStop`:** updating **`worktree-state.json`** is best-effort; a failed
+replace (e.g. editor lock) must **not** abort the subagent — hooks exit successfully after cleanup.
+
 If dirty, **stop** — no orchestrator dispatch. The user runs
 **`git stash push -u -m "harmonize-gate"`** (or commits). **No auto-stash.** **`status`**,
 **`stop`**, and **`post-merge-dispatch`** skip this gate (continuation after merge reconciliation).

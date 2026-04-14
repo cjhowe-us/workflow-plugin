@@ -60,7 +60,7 @@ memory — state and conventions live in the skill.
 
 | Item | Path |
 |------|------|
-| Repository | Resolve **once** per pass: `repo: <path>` from the prompt if present, else `git rev-parse --show-toplevel` from the tool environment. Call this **`REPO`**. **All** reads and writes use `REPO` only — never touch `docs/plans/` in another checkout. |
+| Repository | Resolve **once** per pass: `repo: <path>` from the prompt if present; else the **primary** checkout (**`dirname`** of absolute **`git rev-parse --git-common-dir`**, resolving a relative common-dir against **`git rev-parse --show-toplevel`** first — same as **`main_repo_root`** in `hooks/subagent-start-worktree-state.sh`). **Do not** use **`show-toplevel` alone** when the session cwd may be a linked worktree. Call this **`REPO`**. **All** reads and writes use **`REPO`** only — never touch **`docs/plans/`** in another checkout. |
 | State dir | `$REPO/docs/plans/` |
 | Lock file | `$REPO/docs/plans/locks.md` |
 | Run lock file | `$REPO/docs/plans/harmonize-run-lock.md` |

@@ -80,10 +80,9 @@ if [[ "$HOOK_EVENT" == "WorktreeRemove" ]]; then
     | .workspace = $ws
     ' >"$TMP"
   then
-    mv "$TMP" "$FILE"
+    mv "$TMP" "$FILE" || rm -f "$TMP"
   else
     rm -f "$TMP"
-    exit 0
   fi
   exit 0
 fi
@@ -122,10 +121,9 @@ if echo "$BASE" | jq -S \
   | .workspace = $ws
   ' >"$TMP"
 then
-  mv "$TMP" "$FILE"
+  mv "$TMP" "$FILE" || rm -f "$TMP"
 else
   rm -f "$TMP"
-  exit 0
 fi
 
 exit 0

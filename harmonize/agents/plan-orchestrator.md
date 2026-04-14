@@ -41,7 +41,7 @@ bootstrap flow. Do not act on harmonize state from memory — always load the sk
 
 | Item | Path |
 |------|------|
-| Repository | **`REPO`**: `repo: <path>` from the prompt if present, else `git rev-parse --show-toplevel`. All paths below are under **`REPO`** only. |
+| Repository | **`REPO`** — see **Resolve `REPO`** below (always the **primary** checkout). |
 | Plans dir | `$REPO/docs/plans/` |
 | Root plan | `$REPO/docs/plans/index.md` |
 | Progress dir | `$REPO/docs/plans/progress/` |
@@ -49,14 +49,45 @@ bootstrap flow. Do not act on harmonize state from memory — always load the sk
 | Worktree state | `$REPO/docs/plans/worktree-state.json` (Claude **`SubagentStart`** / **`SubagentStop`** hooks) |
 | GitHub CLI | `gh` (authenticated) |
 
-If any are missing, stop and report to the user.
+### Resolve `REPO` (primary checkout)
+
+Orchestrators coordinate from the **primary** working tree where **`docs/plans/`** and
+**`worktree-state.json`** live. Linked worktrees under **`harmonius-worktrees/`** are for workers
+only.
+
+- If the prompt includes **`repo: <path>`**, use that path as **`REPO`**.
+- Otherwise **do not** use `git rev-parse --show-toplevel` alone: when this agent runs as a
+  subagent, the tool cwd may be a **linked** worktree, and `show-toplevel` would point at that child
+  checkout (wrong **`HEAD`**, wrong dirty state for the stash gate).
+
+Resolve **`REPO`** with the same **`main_repo_root`** algorithm as
+`hooks/subagent-start-worktree-state.sh` (absolute **`git-common-dir`**, then **`dirname`**):
+
+```bash
+_START="${CURSOR_WORKSPACE_ROOT:-${CLAUDE_PROJECT_ROOT:-$PWD}}"
+d=$(cd "$_START" && pwd) || exit 1
+g=$(git -C "$d" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+  || g=$(git -C "$d" rev-parse --git-common-dir) || exit 1
+if [[ "$g" != /* ]]; then
+  g="$(git -C "$d" rev-parse --show-toplevel)/$g"
+fi
+REPO=$(dirname "$g")
+```
+
+All paths below are under **`$REPO`** only.
+
+If any prerequisite path under **`$REPO`** is missing, stop and report to the user.
 
 ## Stash gate
 
-Before any work in **`run`**, **`merge-detection`**, or **`dispatch-only`**, verify the primary repo
-(same path as Prerequisites): **`git rev-parse --abbrev-ref HEAD`** is **`main`**, and
-**`git status --porcelain`** is empty. If not, **stop** — same message as harmonize master **§0**
-(stash or commit, then re-run). **Skip** for **`status`**.
+Before any work in **`run`**, **`merge-detection`**, or **`dispatch-only`**, verify
+**the primary checkout** using **`$REPO`** from **Resolve `REPO`** (never the linked worktree cwd):
+
+1. **`git -C "$REPO" rev-parse --abbrev-ref HEAD`** is **`main`**
+2. **`git -C "$REPO" status --porcelain`** is empty
+
+If not, **stop** — same message as harmonize master **§0** (stash or commit, then re-run). **Skip**
+for **`status`**.
 
 ## Invocation modes
 
