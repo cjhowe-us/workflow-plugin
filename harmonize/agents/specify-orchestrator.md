@@ -95,9 +95,9 @@ Agent({
 })
 ```
 
-For each dispatched task, append **one** minimal row to `docs/plans/in-flight.md`: `task_id`,
-`worker_agent`, `phase: specify`, `subsystem`, `started_at`, `last_seen` (see `in-flight.md`
-template). Do not write agent-tree registries.
+For each dispatched task, append **one** minimal row to `docs/plans/in-flight.md` and register the
+same **`task_id`** in **`docs/plans/worktree-state.json`** **`running_tasks`** per harmonize master
+**§7a** (optional **`branch`** if known).
 
 ### 5. Wait for completion notifications
 

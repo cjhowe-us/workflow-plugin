@@ -84,9 +84,8 @@ section B).
 
 ### 5. Dispatch workers in parallel
 
-Batch all worker dispatches in one message to maximize parallelism. After each dispatch, append
-**one** minimal row to `docs/plans/in-flight.md` (`task_id`, `worker_agent`, `phase: design`,
-`subsystem`, `started_at`, `last_seen`).
+Batch all worker dispatches in one message to maximize parallelism. After each dispatch, update
+`docs/plans/in-flight.md` and **`docs/plans/worktree-state.json`** per harmonize master **§7a**.
 
 ### 6. Wait for completion notifications
 

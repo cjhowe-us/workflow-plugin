@@ -11,6 +11,13 @@
         ],
         "matcher": "Write|Edit"
       }
+    ],
+    "subagentStop": [
+      {
+        "command": "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop-worktree-state.py",
+        "timeout": 30,
+        "type": "command"
+      }
     ]
   },
   "version": 1

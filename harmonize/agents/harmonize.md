@@ -65,6 +65,7 @@ memory — state and conventions live in the skill.
 | Lock file | `$REPO/docs/plans/locks.md` |
 | Run lock file | `$REPO/docs/plans/harmonize-run-lock.md` |
 | In-flight file | `$REPO/docs/plans/in-flight.md` |
+| Worktree state | `$REPO/docs/plans/worktree-state.json` — running background tasks; **`subagentStop`** hook removes finished **`task_id`** and sets **`last_subagent_stop`** |
 | Per-phase progress | `$REPO/docs/plans/progress/phase-{specify,design,plan,release}.md` |
 | Per-plan progress | `$REPO/docs/plans/progress/PLAN-<id>.md` |
 | Worktrees dir | `$REPO/../harmonius-worktrees/` (sibling of `REPO`; adjust only if the project uses a different convention documented in that repo) |
@@ -449,12 +450,27 @@ Agent({
 In **`mode: merge-detection`** and **`mode: run`** (root pass that scheduled
 **`post-merge-dispatch`**), **skip** this §7 entirely.
 
-#### 7a. `in-flight.md` (minimal)
+#### 7a. `in-flight.md` + `worktree-state.json`
 
-Immediately after each **`Agent(..., run_in_background: true)`** returns, append **one** row to
-`docs/plans/in-flight.md`: `task_id`, `worker_agent`, `phase`, `subsystem` (or `all`), `plan_id`
-when applicable, `started_at`, `last_seen`. **Do not** record tree paths, parent tasks, or duplicate
-registries — resume state lives in **Git worktrees** + **`PLAN-*`** + **`locks.md`**.
+Immediately after each **`Agent(..., run_in_background: true)`** returns:
+
+1. Append **one** row to **`in-flight.md`**: `task_id`, `worker_agent`, `phase`, `subsystem` (or
+   `all`), `plan_id` when applicable, `started_at`, `last_seen`.
+
+2. Upsert **`worktree-state.json`** (create from `document-templates` **`worktree-state.json`** if
+   missing): append to **`running_tasks`** an object with sorted keys **`branch`** (optional),
+   **`plan_id`** (optional), **`started_at`** (ISO UTC), **`status`**: **`running`**,
+   **`subagent_type`** (same as `worker_agent`), **`task_id`**. Do not duplicate the same
+   **`task_id`**.
+
+The Cursor **`subagentStop`** hook runs **`subagent-stop-worktree-state.py`**, which **removes**
+that **`task_id`** from **`running_tasks`**, sets **`last_subagent_stop`** to **`status: stopped`**
+with **`stopped_at`**, and bumps **`updated_at`**. Resume truth stays **Git worktrees** +
+**`PLAN-*`** + **`locks.md`**; **`worktree-state.json`** is only for **live background task**
+visibility.
+
+**`mode: status`:** include **`worktree-state.json`** (`running_tasks` count +
+**`last_subagent_stop`** if set).
 
 ### 8. Phase-progress updates (material changes only)
 

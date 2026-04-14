@@ -46,6 +46,7 @@ bootstrap flow. Do not act on harmonize state from memory — always load the sk
 | Root plan | `$REPO/docs/plans/index.md` |
 | Progress dir | `$REPO/docs/plans/progress/` |
 | Worktrees dir | `$REPO/../harmonius-worktrees/` |
+| Worktree state | `$REPO/docs/plans/worktree-state.json` (optional; hook updates on subagent stop) |
 | GitHub CLI | `gh` (authenticated) |
 
 If any are missing, stop and report to the user.
@@ -214,8 +215,8 @@ reviewer can run **`git worktree list`** from the primary checkout.
 Before **each** dispatch, re-read that plan’s progress file once (status and `pr_review_status` may
 have changed).
 
-After **each** `Agent` return, append **`in-flight.md`** per harmonize master **§7a** (minimal
-schema only).
+After **each** `Agent` return, update **`in-flight.md`** and **`worktree-state.json`** per harmonize
+master **§7a**.
 
 **Do not** wait for workers to finish in this orchestrator pass — record each `task_id`, finish
 §9–10, and return. The harmonize master **§3** reconciliation merges completions into phase progress

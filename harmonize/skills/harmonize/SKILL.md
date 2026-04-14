@@ -294,6 +294,7 @@ not open PRs; it commits review fixes to an existing PR.
 | `docs/plans/locks.md` | Worktree claims (`branch`, path, phase, subsystem, reason) | Sub-skills (claim/release), harmonize agent (report only) |
 | `docs/plans/harmonize-run-lock.md` | One root harmonize chain at a time; live/ambiguous contention → **`AskUserQuestion`** (agent §0b) | harmonize master |
 | `docs/plans/in-flight.md` | Running background tasks | harmonize agent, phase orchestrators |
+| `docs/plans/worktree-state.json` | **`running_tasks`** + **`last_subagent_stop`**; pruned by **`subagentStop`** hook | dispatchers write; hook on stop |
 
 ## Routing on invocation
 
@@ -435,6 +436,8 @@ git worktree list: (paste or summarize rows)
 In-flight background tasks (sparse): 8
   - feature-author (ai, task abc123, started 14:30Z)
   - plan-implementer (PLAN-platform-windowing, task def456, started 14:45Z)
+
+worktree-state.json:8 running_tasks; last_subagent_stop: stopped task xyz at 16:02Z (from subagentStop hook)
 
 Cron: active, next fire in 7 minutes
 ```
