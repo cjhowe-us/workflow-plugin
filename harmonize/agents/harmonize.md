@@ -4,9 +4,10 @@ description: >
   Master SDLC supervisor for the Harmonius project. Reads full project state across all
   phases (specify, design, plan, TDD, review, release), respects coarse interactive locks,
   dispatches phase-specific orchestrators as background tasks, and reconciles completion
-  notifications. Replaces the legacy workflow-supervisor agent. Spawned by the harmonize
-  skill when the user invokes /harmonize (bare or run), when the merge-detection cron fires, or when
-  a sub-skill releases a coarse lock.
+  notifications. Default run stops in-flight background tasks (restart sweep) before dispatch.
+  Replaces the legacy workflow-supervisor agent. Spawned by the harmonize skill when the user
+  invokes /harmonize (bare or run), when the merge-detection cron fires, or when a sub-skill
+  releases a coarse lock.
 model: opus
 tools:
   - Agent
@@ -79,11 +80,11 @@ Parse the prompt for a mode keyword. Default is `run`.
 
 | Mode | Behavior |
 |------|----------|
-| `run` | Full cycle: reconcile, enforce locks, **start** `plan-orchestrator` **merge-detection** in background, **immediately** chain **`post-merge-dispatch`** (nested background `harmonize`) — **no** poll/sleep in this process |
+| `run` | Full cycle: reconcile, **restart sweep** (stop all still-running in-flight tasks), enforce locks, **start** merge-detection + **`post-merge-dispatch`** chain — **no** poll/sleep in the root pass |
 | `status` | Read state, print summary, do not dispatch |
 | `stop` | Stop every in-flight task, keep locks, report |
 | `merge-detection` | **Only** `plan-orchestrator` merge-detection (§5 single-spawn); re-read state; report — no fan-out |
-| `post-merge-dispatch` | **Continuation:** await the merge-detection `task_id` from the prompt via `TaskGet`/`TaskOutput` only (no `sleep`), re-read state, then **§6–9** |
+| `post-merge-dispatch` | **Continuation:** await merge-detection `task_id`, reconcile it, **restart sweep**, locks, then **§6–9** |
 | `dispatch-only` | Skip merge detection; compute ready sets and parallel-dispatch orchestrators |
 | `resume <phase> <subsystem>` | After a lock release, re-scan and dispatch the resource |
 
@@ -157,17 +158,32 @@ If `CronList` / `CronCreate` is unavailable or fails after a best effort, log a 
 phase-plan event log (or stdout summary) and **continue**. Cron is optional; every `mode: run` pass
 still performs **ordered** merge-detection before dispatch so PRs advance without the scheduler.
 
-### 3. Reconcile in-flight tasks
+### 3. Reconcile in-flight tasks + default restart sweep
 
 For each entry in `in-flight.md`:
 
-1. Call `TaskList` and check whether `task_id` still exists
-2. If completed, call `TaskOutput(task_id)` to read the result, then:
+1. Call `TaskList` / `TaskGet` and check whether `task_id` still exists
+2. If **completed**, call `TaskOutput(task_id)` to read the result, then:
    - Parse summary (which files written, which PR opened, any warnings)
    - Update the corresponding phase-progress file
    - Remove the entry from `in-flight.md`
-3. If stopped / errored, append a warning to the phase-progress file event log, remove entry
-4. If still running, update `last_seen` to the current UTC timestamp
+3. If **stopped** / **errored** / **unknown task_id**, append a warning to the phase-progress event
+   log, remove entry
+4. If **still running**:
+   - **`mode: status`** or **`merge-detection`** — update `last_seen` to current UTC only (do
+     **not** stop tasks)
+   - **`mode: stop`** — call **`TaskStop(task_id)`**, log
+     `harmonize: stop mode — <worker_agent> <task_id>`, remove entry (no redispatch)
+   - **`mode: run`**, **`post-merge-dispatch`**, **`dispatch-only`**, or **`resume`** —
+     **restart sweep:** call **`TaskStop(task_id)`**, append
+     `harmonize: TaskStop for default restart — <worker_agent> <task_id>`, remove entry
+
+**`post-merge-dispatch` ordering:** the first time through, do **not** run §3 **before** **§5b** —
+you would `TaskStop` the active merge-detection task. Path: **§1** (and optionally **§2**) → **§5b**
+await → reconcile merge task + remove its `in-flight` row → **§3** (reconcile + restart sweep on
+what remains) → **§4** → **§6–9**.
+
+**`mode: run`** (root) and other modes: **§1 → §2 → §3 → §4 → §5** as written below.
 
 ### 4. Enforce coarse locks
 
@@ -227,8 +243,9 @@ Agent({
 })
 ```
 
-The continuation runs **`mode: post-merge-dispatch`**, performs the await above, re-reads state,
-then **§6–9**.
+The continuation runs **`mode: post-merge-dispatch`**: **§1** read state → **§5b** await → reconcile
+merge task and remove its `in-flight` row → **§3** (reconcile + restart sweep on remaining rows) →
+**§4** → **§6–9** (see §3 ordering — never §3 before the merge await).
 
 After merge-detection completes (**for `post-merge-dispatch` and `merge-detection` only**),
 **re-read** `docs/plans/progress/PLAN-*.md`, `docs/plans/index.md`, and `phase-plan.md` so the ready
@@ -351,7 +368,8 @@ Running this agent twice back-to-back must be safe:
 
 - Re-read every state file (values may have changed between runs)
 - Never advance progress forward — only workers own status transitions
-- Never dispatch a resource that is already in-flight (check in-flight.md first)
+- A **`run`** pass **intentionally** `TaskStop`s prior runners (restart sweep) — the next wave must
+  not assume old task IDs are still valid
 
 ## When to escalate to the user
 

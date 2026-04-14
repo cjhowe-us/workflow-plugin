@@ -5,6 +5,7 @@ description: >
   development lifecycle: feature/requirement/user-story ideation, hierarchical design, design
   review, implementation planning, hierarchical TDD execution, PR review, and release.
   Requires plans to link to design docs and design docs to trace F/R/US.
+  Default run restarts in-flight background tasks before the dispatch wave.
   A bare /harmonize immediately dispatches the harmonize master agent in the background (no
   approval, no “what next?” prompt). The master chains merge-detection and a post-merge continuation
   (gh on PLAN-* PRs) before fanning out every unblocked worker in parallel. Routes user
@@ -54,6 +55,11 @@ When the user invokes **`/harmonize`** with **no** arguments, or **`/harmonize r
    **not** poll or sleep; the continuation re-reads progress, then issues **one** parallel batch of
    orchestrators (`plan-orchestrator` **`dispatch-only`** + specify + design as needed). Never skip
    merge reconciliation before that wave in `mode: run`.
+5. **Default restart of in-flight work** — on **`run`**, **`post-merge-dispatch`** (after merge
+   completes), **`dispatch-only`**, and **`resume`**, the master **`TaskStop`s** every background
+   task still listed as running in `in-flight.md` (merge-detection agent is awaited **before** this
+   sweep in the continuation). Then the dispatch wave spawns **fresh** orchestrators. **`status`**
+   and **`merge-detection`** do not stop running tasks; **`stop`** stops them without redispatch.
 
 Use **`/harmonize status`** (or `status` argument) only when the user wants a read-only summary with
 **no** background dispatch.
@@ -63,7 +69,8 @@ Use **`/harmonize status`** (or `status` argument) only when the user wants a re
 Orchestrators should build **deep trees** of **`Agent(..., run_in_background: true)`** calls: one
 branch per unblocked plan (and per specify/design worker), not sequential “one plan at a time”
 scheduling. **Forbidden** for pacing: `bash sleep` or long idle loops in orchestrators — use task
-APIs, completion notifications, or the next harmonize reconciliation pass (`in-flight.md` §3).
+APIs, completion notifications, or the next harmonize reconciliation pass (`in-flight.md` §3). A
+full **`run`** also **stops** stale runners via §3 restart sweep before issuing a new wave.
 
 ## Stash gate (clean `main`)
 
@@ -277,13 +284,15 @@ switch.
 A bare `/harmonize` (no argument) must **not** stop at status-only or merge-detect alone. Dispatch
 the `harmonize` master agent in background with default mode `run` so it:
 
-1. Reconciles state (locks, in-flight, phase files, `PLAN-*` progress).
+1. Reconciles completed in-flight tasks, then **`TaskStop`s** every remaining running background
+   task (restart sweep), enforces locks, re-reads phase + `PLAN-*` files.
 2. Starts **`plan-orchestrator`** **`merge-detection`** in the background and chains **`harmonize`**
    **`post-merge-dispatch`** so merge completes **before** implementers without the root pass
    blocking on polls — for each `PLAN-*` with a PR, **`gh pr view`**; archive merged plans; update
    event logs; refresh `docs/plans/index.md` when the orchestrator recomputes order — **no** worker
    dispatch in merge-detection.
-3. The continuation re-reads progress and computes each phase’s ready set.
+3. The continuation awaits merge, reconciles it, runs the same **restart sweep** on other runners,
+   then re-reads progress and computes each phase’s ready set.
 4. Dispatches **every** phase orchestrator that has ready work **in one parallel batch** (same
    message, multiple `Agent` calls): **`plan-orchestrator`** **`dispatch-only`** plus
    **`specify-orchestrator`** / **`design-orchestrator`** when applicable. **Per-topic** ordering
