@@ -1,7 +1,7 @@
 {
   "metadata": {
     "description": "Official plugin marketplace for the Harmonius game engine.",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "name": "cjhowe-us-workflow",
   "owner": {
@@ -25,7 +25,7 @@
         "markdown",
         "rumdl"
       ],
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "author": {
@@ -45,7 +45,7 @@
         "tdd",
         "workflow"
       ],
-      "version": "2.0.21"
+      "version": "2.0.22"
     }
   ]
 }
