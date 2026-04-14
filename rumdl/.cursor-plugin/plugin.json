@@ -1,0 +1,19 @@
+{
+  "author": {
+    "name": "Christian Howe",
+    "email": "cjhowe@users.noreply.github.com"
+  },
+  "description": "Markdown linting and formatting via rumdl: PostToolUse hook that runs rumdl fmt after Markdown edits, and the Markdown coding-standard skill.",
+  "homepage": "https://github.com/cjhowe-us/workflow",
+  "keywords": [
+    "formatter",
+    "gfm",
+    "linter",
+    "markdown",
+    "rumdl"
+  ],
+  "license": "Apache-2.0",
+  "name": "rumdl",
+  "repository": "https://github.com/cjhowe-us/workflow",
+  "version": "1.0.0"
+}

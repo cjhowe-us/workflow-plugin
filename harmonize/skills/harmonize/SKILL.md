@@ -65,8 +65,8 @@ When the user invokes **`/harmonize`** with **no** arguments, or **`/harmonize r
    - If those APIs are **absent** (typical Cursor hosts): treat the file as **stale** after a killed
      tree — **flush** `in_flight` to `[]`, append a **`phase-plan.md` event**, then spawn **fresh**
      orchestrators (never assume dead `task_id` values are still stoppable).
-**`status`** and **`merge-detection`** do not stop running tasks; **`stop`** stops them without
-redispatch.
+   **`status`** and **`merge-detection`** do not stop running tasks; **`stop`** stops them without
+   redispatch.
 
 Use **`/harmonize status`** (or `status` argument) only when the user wants a read-only summary with
 **no** background dispatch.
@@ -94,9 +94,9 @@ If dirty, **stop** — no orchestrator dispatch. The user runs
 ## Killed agent trees (`in-flight.md` orphans)
 
 Stopping nested background agents in the IDE (or dropping a session) can leave
-**`docs/plans/in-flight.md`** rows whose **`task_id` values are dead**. Without
-**`TaskList` / `TaskStop`**, the host cannot tell live tasks from ghosts, so the registry may block
-locks or duplicate dispatch.
+**`docs/plans/in-flight.md`** rows whose **`task_id` values are dead**. Without **`TaskList` /
+`TaskStop`**, the host cannot tell live tasks from ghosts, so the registry may block locks or
+duplicate dispatch.
 
 | Situation | Handler action |
 |-----------|----------------|
@@ -321,9 +321,9 @@ switch.
 A bare `/harmonize` (no argument) must **not** stop at status-only or merge-detect alone. Dispatch
 the `harmonize` master agent in background with default mode `run` so it:
 
-1. Reconciles **`in-flight.md`** per the
-   **[Killed agent trees](#killed-agent-trees-in-flightmd-orphans)** restart sweep (`TaskStop` when
-   task APIs exist; **flush** when they do not), enforces locks, re-reads phase + `PLAN-*` files.
+1. Reconciles **`in-flight.md`** per the **[Killed agent trees](#killed-agent-trees-in-flightmd-orphans)**
+   restart sweep (`TaskStop` when task APIs exist; **flush** when they do not), enforces locks,
+   re-reads phase + `PLAN-*` files.
 2. Starts **`plan-orchestrator`** **`merge-detection`** in the background and chains **`harmonize`**
    **`post-merge-dispatch`** so merge completes **before** implementers without the root pass
    blocking on polls — for each `PLAN-*` with a PR, **`gh pr view`**; archive merged plans; update

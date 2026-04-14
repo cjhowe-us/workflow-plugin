@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "description": "Cursor plugin marketplace mirror for Harmonius workflow (cjhowe-us-workflow).",
+    "version": "1.0.0"
+  },
+  "name": "cjhowe-us-workflow",
+  "owner": {
+    "email": "cjhowe@users.noreply.github.com",
+    "name": "Christian Howe"
+  },
+  "plugins": [
+    {
+      "author": {
+        "name": "Christian Howe"
+      },
+      "category": "development",
+      "description": "Markdown linting and formatting via rumdl: hooks and the markdown coding-standard skill.",
+      "name": "rumdl",
+      "source": "./rumdl",
+      "tags": [
+        "formatter",
+        "gfm",
+        "linter",
+        "markdown",
+        "rumdl"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "author": {
+        "name": "Christian Howe"
+      },
+      "category": "development",
+      "description": "Development workflow with coding standards, document templates, and supervisor agents for the full ideate-design-implement-release lifecycle. Depends on the rumdl plugin.",
+      "name": "harmonize",
+      "source": "./harmonize",
+      "tags": [
+        "coding-standards",
+        "document-templates",
+        "game-engine",
+        "harmonize",
+        "lifecycle",
+        "rust",
+        "tdd",
+        "workflow"
+      ],
+      "version": "2.0.11"
+    }
+  ]
+}
