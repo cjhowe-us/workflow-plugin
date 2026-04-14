@@ -4,6 +4,7 @@
     "url": "https://github.com/cjhowe-us"
   },
   "description": "Hierarchical development workflow with coding standards, document templates, and supervisor agents for the full ideate-design-implement-release lifecycle. Requires the rumdl plugin for Markdown linting and auto-formatting.",
+  "hooks": "./hooks/hooks.json",
   "keywords": [
     "coding-standards",
     "document-templates",
@@ -16,5 +17,5 @@
   "license": "Apache-2.0",
   "name": "harmonize",
   "repository": "https://github.com/cjhowe-us/workflow",
-  "version": "2.0.15"
+  "version": "2.0.16"
 }

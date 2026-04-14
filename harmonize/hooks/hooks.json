@@ -12,7 +12,7 @@
         "matcher": "Write|Edit"
       }
     ],
-    "subagentStop": [
+    "SubagentStop": [
       {
         "command": "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop-worktree-state.sh",
         "timeout": 30,

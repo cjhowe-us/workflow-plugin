@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# On subagentStop: remove task_id from docs/plans/worktree-state.json running_tasks;
-# set last_subagent_stop (requires jq).
+# Claude Code SubagentStop hook: remove agent_id/task_id from docs/plans/worktree-state.json
+# running_tasks; set last_subagent_stop (requires jq).
 set -euo pipefail
 
 INPUT=$(cat)
@@ -38,9 +38,10 @@ FILE="$ROOT/docs/plans/worktree-state.json"
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+# Claude sends agent_id on SubagentStop; keep other keys for compatibility.
 TASK_ID=$(echo "$INPUT" | jq -r '
   [
-    .taskId, .task_id, .id, .subagentTaskId, .subagent_task_id,
+    .agent_id, .taskId, .task_id, .id, .subagentTaskId, .subagent_task_id,
     .task.taskId, .task.task_id, .task.id,
     .subagent.taskId, .subagent.task_id, .subagent.id
   ]
@@ -67,7 +68,9 @@ if echo "$BASE" | jq -S \
   --arg ws "$ROOT" \
   '
   if ($tid | length) > 0 then
-    .running_tasks |= map(select((.task_id | tostring) != $tid))
+    .running_tasks |= map(select(
+      ((.task_id // .agent_id // "") | tostring) != $tid
+    ))
   else
     .
   end

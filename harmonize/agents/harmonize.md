@@ -65,7 +65,7 @@ memory — state and conventions live in the skill.
 | Lock file | `$REPO/docs/plans/locks.md` |
 | Run lock file | `$REPO/docs/plans/harmonize-run-lock.md` |
 | In-flight file | `$REPO/docs/plans/in-flight.md` |
-| Worktree state | `$REPO/docs/plans/worktree-state.json` — **`subagentStop`** runs **`subagent-stop-worktree-state.sh`** (`bash` + **`jq`**) to drop **`task_id`** from **`running_tasks`** and set **`last_subagent_stop`** |
+| Worktree state | `$REPO/docs/plans/worktree-state.json` — **Claude Code `SubagentStop`** runs **`subagent-stop-worktree-state.sh`** (`bash` + **`jq`**) using hook payload **`agent_id`** (and **`task_id`** fallbacks) to prune **`running_tasks`** and set **`last_subagent_stop`** |
 | Per-phase progress | `$REPO/docs/plans/progress/phase-{specify,design,plan,release}.md` |
 | Per-plan progress | `$REPO/docs/plans/progress/PLAN-<id>.md` |
 | Worktrees dir | `$REPO/../harmonius-worktrees/` (sibling of `REPO`; adjust only if the project uses a different convention documented in that repo) |
@@ -460,14 +460,18 @@ Immediately after each **`Agent(..., run_in_background: true)`** returns:
 2. Upsert **`worktree-state.json`** (create from `document-templates` **`worktree-state.json`** if
    missing): append to **`running_tasks`** an object with sorted keys **`branch`** (optional),
    **`plan_id`** (optional), **`started_at`** (ISO UTC), **`status`**: **`running`**,
-   **`subagent_type`** (same as `worker_agent`), **`task_id`**. Do not duplicate the same
-   **`task_id`**.
+   **`subagent_type`** (same as `worker_agent`), **`task_id`**. In **Claude Code**, set
+   **`task_id`** to the subagent **`agent_id`** from the **`Agent`** tool when that is the stable
+   identifier (the hook matches **`task_id`** or **`agent_id`** on each row). Do not duplicate the
+   same id.
 
-The Cursor **`subagentStop`** hook runs **`subagent-stop-worktree-state.sh`** (**`bash`** +
-**`jq`**; if **`jq`** is missing the script exits without error). It **removes** that **`task_id`**
-from **`running_tasks`**, sets **`last_subagent_stop`** to **`status: stopped`** with
-**`stopped_at`**, and bumps **`updated_at`**. Resume truth stays **Git worktrees** + **`PLAN-*`** +
-**`locks.md`**; **`worktree-state.json`** is only for **live background task** visibility.
+**Claude Code** fires **`SubagentStop`** (see plugin **`hooks/hooks.json`**, declared in
+**`.claude-plugin/plugin.json`**). The hook runs **`subagent-stop-worktree-state.sh`** (**`bash`** +
+**`jq`**; exits quietly if **`jq`** is missing). It **removes** the finished subagent from
+**`running_tasks`**, sets **`last_subagent_stop`** to **`status: stopped`** with **`stopped_at`**
+and the id in **`task_id`**, and bumps **`updated_at`**. Resume truth stays **Git worktrees** +
+**`PLAN-*`** + **`locks.md`**; **`worktree-state.json`** is only for **live background task**
+visibility.
 
 **`mode: status`:** include **`worktree-state.json`** (`running_tasks` count +
 **`last_subagent_stop`** if set).
