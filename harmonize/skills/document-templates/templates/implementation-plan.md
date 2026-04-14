@@ -29,11 +29,13 @@ progress_file: docs/plans/progress/PLAN-{domain}-{topic}.md
 > and read the progress file at `docs/plans/progress/PLAN-{domain}-{topic}.md`. Do not duplicate
 > completed steps. Update the progress file as each step finishes. All code changes happen in
 > the worktree at `../harmonius-worktrees/PLAN-{domain}-{topic}/`, never in the main checkout.
+> Add that worktree **only** when starting implementation with real commits to make — not for
+> read-only passes or merge checks.
 
 ## Execution Instructions
 
 1. Read the progress file. If `status != not_started`, resume from the first unchecked item.
-2. If `status == not_started`:
+2. If `status == not_started` and tasks still require changes:
    - `git worktree add ../harmonius-worktrees/PLAN-{domain}-{topic} -b plan/{domain}-{topic}`
    - `cd ../harmonius-worktrees/PLAN-{domain}-{topic}`
    - `gh pr create --draft --base main --head plan/{domain}-{topic} --title "[PLAN-{domain}-{topic}] {Plan Name}"`

@@ -65,7 +65,7 @@ memory — state and conventions live in the skill.
 | Lock file | `$REPO/docs/plans/locks.md` |
 | Run lock file | `$REPO/docs/plans/harmonize-run-lock.md` |
 | In-flight file | `$REPO/docs/plans/in-flight.md` |
-| Worktree state | `$REPO/docs/plans/worktree-state.json` — **Claude Code `SubagentStop`** runs **`subagent-stop-worktree-state.sh`** (`bash` + **`jq`**) using hook payload **`agent_id`** (and **`task_id`** fallbacks) to prune **`running_tasks`** and set **`last_subagent_stop`** |
+| Worktree state | `$REPO/docs/plans/worktree-state.json` — **Claude Code** **`SubagentStart`** / **`SubagentStop`** hooks (`bash` + **`jq`**) maintain **`running_tasks`** ( **`tree_path`**, **`worktree_path`**, **`worktree_hierarchy`**, optional **`parent_agent_id`**, …) so **every** subagent appears while running; **`last_subagent_*`** record the latest transition |
 | Per-phase progress | `$REPO/docs/plans/progress/phase-{specify,design,plan,release}.md` |
 | Per-plan progress | `$REPO/docs/plans/progress/PLAN-<id>.md` |
 | Worktrees dir | `$REPO/../harmonius-worktrees/` (sibling of `REPO`; adjust only if the project uses a different convention documented in that repo) |
@@ -74,9 +74,12 @@ memory — state and conventions live in the skill.
 On first run, if any state file is missing, create it from its template in the `document-templates`
 skill. Never overwrite an existing state file.
 
-**Worktree isolation:** PR branches for specify, design, and plan implementation are created in
-**git worktrees** under `../harmonius-worktrees/` so the primary checkout stays on `main`. See
-worker agent playbooks.
+**Worktree isolation:** One repo, one **primary** working tree (**`REPO`**) plus **linked**
+worktrees under `../harmonius-worktrees/` for PR branches so the primary checkout stays on `main`.
+**Add a linked worktree only when a worker will produce real commits** (docs, code, TDD) — not for
+merge-detection, **`status`**, or other no-change passes. Orchestrators do **not** run
+**`git worktree add`**. Hooks treat the primary tree as the coordination root for this JSON;
+**`git worktree list`** shows the full set. See worker agent playbooks.
 
 ## Invocation modes
 
@@ -450,31 +453,30 @@ Agent({
 In **`mode: merge-detection`** and **`mode: run`** (root pass that scheduled
 **`post-merge-dispatch`**), **skip** this §7 entirely.
 
-#### 7a. `in-flight.md` + `worktree-state.json`
+#### 7a. `in-flight.md` and `worktree-state.json`
 
-Immediately after each **`Agent(..., run_in_background: true)`** returns:
+Immediately after each **`Agent(..., run_in_background: true)`** returns, append **one** row to
+**`in-flight.md`**: `task_id`, `worker_agent`, `phase`, `subsystem` (or `all`), `plan_id` when
+applicable, `started_at`, `last_seen`.
 
-1. Append **one** row to **`in-flight.md`**: `task_id`, `worker_agent`, `phase`, `subsystem` (or
-   `all`), `plan_id` when applicable, `started_at`, `last_seen`.
+**`worktree-state.json`** is updated **only by Claude Code hooks** (not by orchestrator `Write`
+calls): **`SubagentStart`** runs **`subagent-start-worktree-state.sh`** and appends **every**
+spawned subagent to **`running_tasks`**: **`agent_id`**, **`subagent_type`** from **`agent_type`**,
+**`task_id`** (mirrors **`agent_id`**), **`worktree_path`** (hook **`cwd`**),
+**`worktree_hierarchy`** (**`root`** = primary working tree vs **`linked`** = Git dir under
+**`.git/worktrees/`**), **`tree_path`** (subagent hierarchy: parent **`agent_id`** from
+**`parent_agent_id`** / **`source_agent_id`** / **`caller_agent_id`** / **`parent.agent_id`** when
+present; otherwise **`agent_type`/`agent_id`** only), optional **`parent_agent_id`**, **`branch`** /
+**`plan_id`** null unless a future hook enriches them. **`SubagentStop`** runs
+**`subagent-stop-worktree-state.sh`** and removes that agent from **`running_tasks`**, sets
+**`last_subagent_stop`**, bumps **`updated_at`**. See **`hooks/hooks.json`** and
+**`.claude-plugin/plugin.json`**. If **`jq`** is missing, both scripts exit quietly.
 
-2. Upsert **`worktree-state.json`** (create from `document-templates` **`worktree-state.json`** if
-   missing): append to **`running_tasks`** an object with sorted keys **`branch`** (optional),
-   **`plan_id`** (optional), **`started_at`** (ISO UTC), **`status`**: **`running`**,
-   **`subagent_type`** (same as `worker_agent`), **`task_id`**. In **Claude Code**, set
-   **`task_id`** to the subagent **`agent_id`** from the **`Agent`** tool when that is the stable
-   identifier (the hook matches **`task_id`** or **`agent_id`** on each row). Do not duplicate the
-   same id.
+**`mode: status`:** print full **`running_tasks`** (all active agents) plus
+**`last_subagent_start`** and **`last_subagent_stop`**.
 
-**Claude Code** fires **`SubagentStop`** (see plugin **`hooks/hooks.json`**, declared in
-**`.claude-plugin/plugin.json`**). The hook runs **`subagent-stop-worktree-state.sh`** (**`bash`** +
-**`jq`**; exits quietly if **`jq`** is missing). It **removes** the finished subagent from
-**`running_tasks`**, sets **`last_subagent_stop`** to **`status: stopped`** with **`stopped_at`**
-and the id in **`task_id`**, and bumps **`updated_at`**. Resume truth stays **Git worktrees** +
-**`PLAN-*`** + **`locks.md`**; **`worktree-state.json`** is only for **live background task**
-visibility.
-
-**`mode: status`:** include **`worktree-state.json`** (`running_tasks` count +
-**`last_subagent_stop`** if set).
+Resume truth for **worktrees** remains **Git worktrees** + **`PLAN-*`** + **`locks.md`**;
+**`worktree-state.json`** is the **live subagent roster** from hooks.
 
 ### 8. Phase-progress updates (material changes only)
 

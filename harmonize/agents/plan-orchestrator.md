@@ -46,7 +46,7 @@ bootstrap flow. Do not act on harmonize state from memory — always load the sk
 | Root plan | `$REPO/docs/plans/index.md` |
 | Progress dir | `$REPO/docs/plans/progress/` |
 | Worktrees dir | `$REPO/../harmonius-worktrees/` |
-| Worktree state | `$REPO/docs/plans/worktree-state.json` (optional; hook updates on subagent stop) |
+| Worktree state | `$REPO/docs/plans/worktree-state.json` (Claude **`SubagentStart`** / **`SubagentStop`** hooks) |
 | GitHub CLI | `gh` (authenticated) |
 
 If any are missing, stop and report to the user.
@@ -98,8 +98,10 @@ Read `docs/plans/locks.md` and keep it in memory for §6–8.
 ### 4b. Scan existing worktrees (resume + isolation)
 
 **Purpose:** Background agents use **one git worktree per branch** under the worktrees root so each
-subagent works in an isolated checkout. Before dispatching, reconcile **on-disk worktrees** with
-`PLAN-*` progress and **`locks.md`**.
+subagent works in an isolated checkout — **only when** that agent will **change** the repo
+(**`plan-implementer`**, doc PR workers). This orchestrator **never** runs **`git worktree add`** or
+creates directories under **`harmonius-worktrees/`**; it only reconciles lists. Before dispatching,
+reconcile **on-disk worktrees** with `PLAN-*` progress and **`locks.md`**.
 
 1. Run:
 
@@ -215,8 +217,8 @@ reviewer can run **`git worktree list`** from the primary checkout.
 Before **each** dispatch, re-read that plan’s progress file once (status and `pr_review_status` may
 have changed).
 
-After **each** `Agent` return, update **`in-flight.md`** and **`worktree-state.json`** per harmonize
-master **§7a**.
+After **each** `Agent` return, update **`in-flight.md`** only; **`worktree-state.json`** is owned by
+**`SubagentStart`** / **`SubagentStop`** hooks (harmonize master **§7a**).
 
 **Do not** wait for workers to finish in this orchestrator pass — record each `task_id`, finish
 §9–10, and return. The harmonize master **§3** reconciliation merges completions into phase progress

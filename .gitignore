@@ -1,1 +1,7 @@
 .rumdl_cache/
+
+# Harmonize machine-local orchestration (primary worktree only; not shared across developers).
+docs/plans/worktree-state.json
+docs/plans/in-flight.md
+docs/plans/locks.md
+docs/plans/harmonize-run-lock.md

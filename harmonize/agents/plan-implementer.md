@@ -58,7 +58,9 @@ subagents per plan).
 
 ### 2. Bootstrap the worktree and draft PR
 
-Only run this step if `status == not_started`.
+Only run this step if `status == not_started` **and** the plan’s task breakdown still requires
+**file or test changes** (if everything is already done with nothing left to commit, update
+**`progress`** and return — do **not** add a worktree).
 
 1. Ensure the worktrees directory exists:
 

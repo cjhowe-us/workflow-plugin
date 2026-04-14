@@ -85,7 +85,7 @@ section B).
 ### 5. Dispatch workers in parallel
 
 Batch all worker dispatches in one message to maximize parallelism. After each dispatch, update
-`docs/plans/in-flight.md` and **`docs/plans/worktree-state.json`** per harmonize master **§7a**.
+`docs/plans/in-flight.md` only (**`worktree-state.json`**: **`SubagentStart`** hook — **§7a**).
 
 ### 6. Wait for completion notifications
 

@@ -110,14 +110,29 @@ locks or duplicate dispatch.
 
 ## Worktree isolation
 
+Git keeps **one** object database per repository; **one primary working tree** (the checkout that
+owns the real **`.git`** directory) plus **linked worktrees** (each with its own directory and
+**`HEAD`**, sharing that DB). That layout is a **hierarchy for coordination**: the primary tree is
+the root for **`docs/plans/`** and **`worktree-state.json`**; linked directories are **child**
+checkouts (see **`git worktree list`** — first row is usually the primary tree).
+
 All **specify**, **design**, and **plan TDD** PR branches are created via **`git worktree add`**
 under **`$REPO/../harmonius-worktrees/`** (sibling of the primary checkout) so agents never
 **`git checkout -b`** inside the primary repo. The primary checkout stays on **`main`** for
 coordination.
 
+**No idle worktrees:** Run **`git worktree add`** only when a worker will **change tracked files**
+(or add new ones) for a real PR. Do **not** add worktrees for **merge-detection**,
+**`mode: status`**, read-only reconciliation, empty orchestrator waves, or any pass that will
+**not** produce commits. **Orchestrators** (including **`plan-orchestrator`**) **never** run
+**`git worktree add`** themselves — only workers that start document or implementation PRs do, at
+the moment work begins.
+
 **Subagents are isolated per worktree:** each **`plan-implementer`** owns **one** directory; nested
 **`test-writer`** / **`implementer`** runs use that same path — they do not add parallel worktrees
-for the same branch.
+for the same branch. **`SubagentStart`** records **`worktree_path`**, **`worktree_hierarchy`**
+(`root` vs `linked` from the Git dir path), **`parent_agent_id`** when the hook supplies it, and
+**`tree_path`** (subagent path built from parent rows in **`running_tasks`**).
 
 **Resume:** use **`git worktree list`**, **`PLAN-*`** (`branch`, `worktree_path`, `status`), and
 **`locks.md`**. Each lock row names a **branch**, **worktree path**, **phase**, **subsystem**, and a
@@ -294,7 +309,7 @@ not open PRs; it commits review fixes to an existing PR.
 | `docs/plans/locks.md` | Worktree claims (`branch`, path, phase, subsystem, reason) | Sub-skills (claim/release), harmonize agent (report only) |
 | `docs/plans/harmonize-run-lock.md` | One root harmonize chain at a time; live/ambiguous contention → **`AskUserQuestion`** (agent §0b) | harmonize master |
 | `docs/plans/in-flight.md` | Running background tasks | harmonize agent, phase orchestrators |
-| `docs/plans/worktree-state.json` | **`running_tasks`** + **`last_subagent_stop`**; pruned by Claude Code **`SubagentStop`** (`bash` + **`jq`**) | dispatchers write; plugin hook |
+| `docs/plans/worktree-state.json` | **`running_tasks`** ( **`agent_id`**, **`tree_path`**, **`worktree_path`**, **`worktree_hierarchy`**, optional **`parent_agent_id`**, …) + **`last_subagent_*`**; Claude **`SubagentStart`** / **`SubagentStop`** (`bash` + **`jq`**) | plugin hooks only |
 
 ## Routing on invocation
 
@@ -437,7 +452,7 @@ In-flight background tasks (sparse): 8
   - feature-author (ai, task abc123, started 14:30Z)
   - plan-implementer (PLAN-platform-windowing, task def456, started 14:45Z)
 
-worktree-state.json:8 running_tasks; last_subagent_stop: stopped agent_id xyz at 16:02Z (SubagentStop hook)
+worktree-state.json: running_tasks (agent_id, tree_path, worktree_hierarchy root|linked, worktree_path, …); last_subagent_start / last_subagent_stop
 
 Cron: active, next fire in 7 minutes
 ```
