@@ -159,7 +159,7 @@ When the user invokes this skill, parse the argument and route:
 
 | Argument | Response |
 |----------|----------|
-| (none) | Print SDLC status, run manual merge-detection backup, ask what to work on |
+| (none) | Same as `run` — continue incomplete work in topological order (see below) |
 | `status` | Print SDLC status summary, do not dispatch |
 | `run` | Dispatch the `harmonize` master agent in background for a full SDLC pass |
 | `stop` | Stop all in-flight tasks, report, do not release locks |
@@ -176,6 +176,20 @@ When the user invokes this skill, parse the argument and route:
 
 Always announce "Loading harmonize-X..." before calling a sub-skill so the user sees the context
 switch.
+
+### Default: topological continuation
+
+A bare `/harmonize` (no argument) must **not** stop at status-only or merge-detect alone. Dispatch
+the `harmonize` master agent in background with default mode `run` so it:
+
+1. Reconciles state, runs merge detection, and computes each phase’s ready set
+2. Dispatches phase orchestrators for all ready work, respecting phase order **1 → 2 → 3** (Phase 4
+   only on explicit user request)
+3. Within Phase 3, honors **dependency order** in `docs/plans/index.md` — only plans whose
+   prerequisites are merged / satisfied advance; `plan-orchestrator` owns the ready set
+
+Foreground may print a one-line acknowledgment; the master agent returns the full summary when the
+pass completes.
 
 ## Cron bootstrap
 
@@ -198,9 +212,9 @@ agent in background.
 
 4. If `CronList` or `CronCreate` is unavailable, errors, or returns no durable job after a best
    effort, continue — do not block the session on cron alone.
-5. In that case (and whenever the user invokes `/harmonize` with no extra argument), run the
-   **manual merge-detection backup** below so merged PRs still advance the plan graph without
-   waiting for the next cron tick.
+5. If cron could not be confirmed, note it in the session summary. A full `run` pass (including bare
+   `/harmonize`) still performs merge detection in the master agent; optionally also run the
+   **manual merge-detection backup** below when the user cannot dispatch a full pass.
 
 ## Manual merge-detection backup
 
@@ -210,8 +224,8 @@ subset as the `merge-detection` mode on the `harmonize` master agent.
 ### When to run
 
 - User says `/harmonize merge-detect` or `/harmonize merge-detection`
-- User says `/harmonize` with no argument (after printing status)
 - Cron bootstrap in the previous section did not confirm an active `[harmonize-merge-detect]` job
+  and a **lightweight** merge check is needed without a full `run`
 
 #### How to run
 

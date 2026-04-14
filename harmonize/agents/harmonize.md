@@ -5,7 +5,7 @@ description: >
   phases (specify, design, plan, TDD, review, release), respects coarse interactive locks,
   dispatches phase-specific orchestrators as background tasks, and reconciles completion
   notifications. Replaces the legacy workflow-supervisor agent. Spawned by the harmonize
-  skill when the user invokes /harmonize run, when the merge-detection cron fires, or when
+  skill when the user invokes /harmonize (bare or run), when the merge-detection cron fires, or when
   a sub-skill releases a coarse lock.
 model: opus
 tools:
@@ -64,7 +64,7 @@ Parse the prompt for a mode keyword. Default is `run`.
 
 | Mode | Behavior |
 |------|----------|
-| `run` | Full cycle: reconcile, merge-detect, enforce locks, dispatch all ready work |
+| `run` | Full cycle: reconcile, merge-detect, enforce locks, dispatch all ready work in **topological order** (phase 1→2→3; Phase 3 follows `docs/plans/index.md` deps via ready set) |
 | `status` | Read state, print summary, do not dispatch |
 | `stop` | Stop every in-flight task, keep locks, report |
 | `merge-detection` | Check only submitted PRs for merges, advance merged, dispatch unblocked |
@@ -146,6 +146,11 @@ submitted PRs via `gh pr view`, advance merged plans, archive progress files, an
 
 ### 6. Compute the phase ready set
 
+Process phases in order **1 → 2 → 3** when interpreting readiness (Specify before Design before Plan
+before TDD/Review for the same topic). For Phase 3 plans, the ready set must respect
+**dependency order** in `docs/plans/index.md`: only plans whose prerequisites are merged or
+satisfied may appear as ready; `plan-orchestrator` computes that set.
+
 For each phase, compute which subsystems are ready to advance:
 
 | Phase | Ready condition |
@@ -161,8 +166,10 @@ Subtract any subsystem with an active lock for that phase. Never auto-dispatch `
 
 ### 7. Dispatch phase orchestrators
 
-For each phase with ready work, dispatch its orchestrator as a background task. Dispatch in parallel
-via multiple `Agent` calls in one message:
+For each phase with ready work, dispatch its orchestrator as a background task. Prefer dispatch
+order that matches **topological continuation**: phase order first, then subsystem / plan order
+consistent with `docs/plans/index.md` for Phase 3. Dispatch in parallel via multiple `Agent` calls
+in one message when independent:
 
 ```text
 Agent({
