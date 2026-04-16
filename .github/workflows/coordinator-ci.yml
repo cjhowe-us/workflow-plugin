@@ -1,0 +1,58 @@
+name: coordinator CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - coordinator/**
+      - .github/workflows/coordinator-ci.yml
+  pull_request:
+    paths:
+      - coordinator/**
+      - .github/workflows/coordinator-ci.yml
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: .sh / .ps1 parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run test-parity.ps1
+        shell: pwsh
+        run: pwsh -NoProfile -File coordinator/tests/test-parity.ps1
+
+  shellcheck:
+    name: shellcheck hooks + scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: coordinator
+          additional_files: coordinator/hooks/*.sh coordinator/scripts/*.sh
+          severity: warning
+
+  pytest:
+    name: offline smoke tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+      - name: Install jq (ubuntu already has it)
+        if: runner.os == 'macOS'
+        run: brew install jq
+      - name: Run pytest
+        working-directory: coordinator/tests
+        run: python -m pytest -v

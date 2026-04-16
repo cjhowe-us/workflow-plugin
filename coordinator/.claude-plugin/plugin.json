@@ -3,7 +3,7 @@
     "name": "Christian Howe",
     "url": "https://github.com/cjhowe-us"
   },
-  "description": "Interactive orchestrator that dispatches up to 3 worker subagents to GitHub PRs whose Project v2 dependencies are resolved, coordinating across machines via per-item lock fields.",
+  "description": "Interactive orchestrator that dispatches up to 3 background worker teammates to GitHub pull requests whose dependencies are resolved. Coordination state lives in a single HTML-comment marker per PR body — no GitHub Projects, no shared filesystem.",
   "keywords": [
     "agent-teams",
     "collaboration",
@@ -13,7 +13,6 @@
     "github",
     "multi-user",
     "orchestrator",
-    "projects-v2",
     "pull-requests",
     "workflow"
   ],

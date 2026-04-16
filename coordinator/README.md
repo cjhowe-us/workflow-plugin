@@ -1,82 +1,75 @@
 # coordinator
 
 Interactive orchestrator plugin for Claude Code. Dispatches up to 3 background worker teammates to
-work in parallel on GitHub pull requests whose Project v2 dependencies are resolved. Multiple users
-— each on their own machine, each running their own orchestrator — coordinate through GitHub itself.
-No shared filesystem needed.
+work in parallel on GitHub pull requests whose dependencies are resolved. Multiple users — each on
+their own machine, each running their own orchestrator — coordinate through GitHub pull requests
+themselves. No shared filesystem, no GitHub Projects, no project setup.
 
 ## What it does
 
-- Scans a GitHub Project v2 for **draft pull requests**. PRs are the only unit of work; there are no
-  issues, tasks, or cards in this model. Every phase of software work (specify / design / plan /
-  implement / release / docs) is a PR. See `skills/pr-phases/SKILL.md` for the full model.
-- Reads Project v2 `blocked by` item-relationships between PRs to build the dependency DAG. A
-  dependent PR only becomes a dispatch candidate once every blocker PR is merged.
-- For every PR in the unblocked frontier, dispatches a worker (agent-teams teammate) that acquires a
-  single Project v2 lock on that PR, works in an isolated git worktree on the PR's branch,
-  heartbeats the lock, then releases on finish or crash. Workers never create or update issues.
+- Scans configured GitHub repositories for **draft pull requests carrying a `phase:<name>` label**.
+  PRs are the only unit of work; there are no issues, tasks, cards, or project items in this model.
+  Every phase of software work (specify / design / plan / implement / release / docs) is a PR. See
+  `skills/pr-phases/SKILL.md` for the full model.
+- Reads each PR's body-marker `blocked_by` list to build the dependency DAG. A dependent PR only
+  becomes a dispatch candidate once every blocker PR in its `blocked_by` is merged.
+- For every PR in the unblocked frontier, dispatches a worker (agent-teams teammate) that splices a
+  coordinator HTML-comment marker into the PR body (the lock), works in an isolated git worktree on
+  the PR's branch, heartbeats the marker's `lock_expires_at`, then strips the marker on finish or
+  crash.
 - Workers run as **background** teammates and cannot prompt the user directly. They `SendMessage`
   the orchestrator with any blocking question; the orchestrator calls `AskUserQuestion` on its own
   interactive turn and relays the answer back.
-
-## Relationship to the `harmonize` plugin
-
-`coordinator` replaces harmonize's SDLC + dispatch layer with a GitHub-native, PR-only model.
-`harmonize` kept state on disk (`docs/plans/`, `locks.md`, `in-flight.md`, `worktree-state.json`)
-and was single-machine; `coordinator` keeps every byte of coordination state in GitHub so it works
-across machines, across contributors, and across contexts (work, personal, group projects, OSS). See
-`skills/pr-phases/SKILL.md` for the side-by-side comparison.
 
 ## Requirements
 
 - Claude Code with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` set.
   **Required — the plugin's `SessionStart` hook blocks the session with exit 2 if this is not set.**
-  Use the bundled installer — it detects your shell and persists the variable the right way for your
-  platform.
+  This plugin **depends on `env-setup`** (same marketplace) to persist the variable cross-platform.
 
-  Bash / zsh / fish / sh:
+  From Claude Code, invoke the env-setup skill:
+
+  ```text
+  /env-setup:env-setup CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1
+  ```
+
+  Or drive the scripts directly:
 
   ```bash
-  ./coordinator/scripts/ensure-agent-teams-env.sh
+  # bash / zsh / fish / sh
+  env-setup/skills/env-setup/scripts/ensure-env.sh \
+    --var CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS --value 1
   ```
-
-  PowerShell (Windows / macOS / Linux):
 
   ```powershell
-  pwsh -NoProfile -File ./coordinator/scripts/ensure-agent-teams-env.ps1
+  # PowerShell — HKCU:\Environment registry on Windows, $PROFILE elsewhere
+  pwsh -NoProfile -File env-setup/skills/env-setup/scripts/ensure-env.ps1 `
+    -VarName CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS -VarValue 1
   ```
 
-  The installer writes to the appropriate target for your shell and OS:
+  `env-setup` detects your shell and writes to the right config for your platform (see
+  `env-setup/README.md` for the supported matrix).
 
-  - **zsh** → `~/.zshrc` (`export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`)
-  - **bash** → `~/.bash_profile` or `~/.bashrc` (`export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`)
-  - **fish** → `~/.config/fish/config.fish` (`set -gx CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1`)
-  - **sh / ksh** → `~/.profile` (`export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`)
-  - **PowerShell on Windows** → user-scope registry `HKCU:\Environment` via
-    `[Environment]::SetEnvironmentVariable(..., 'User')`, which broadcasts `WM_SETTINGCHANGE` so
-    every new process (PowerShell, cmd, Git Bash, GUI apps) inherits the variable. Preferred over
-    `$PROFILE` because `$PROFILE` only affects PowerShell sessions.
-  - **PowerShell on macOS / Linux** → `$PROFILE` (`$env:CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1'`)
+- `gh` CLI authenticated with the `repo` scope (sufficient to read/write PR bodies and labels). No
+  `project` / `read:project` scopes needed.
+- One or more GitHub repositories that the authenticated user can edit.
+- The `env-setup` plugin (listed in the same marketplace.json — install together).
 
-Both installers are idempotent; re-running is a no-op. Pass `--dry-run` (bash) or `-DryRun`
-(PowerShell) to see the detected target without writing anything.
+## State storage — per-PR body marker
 
-- `gh` CLI authenticated with `read:project`, `project`, and `repo` scopes.
-- A GitHub Project v2 containing the PRs in scope.
-- GitHub Pro or Team tier (Project v2 is available to all, custom fields on items are available
-  everywhere; no gating).
-- Two custom fields on the Project (one-time setup — see below).
+The coordinator writes a single HTML-comment marker at the end of every PR it manages:
 
-## One-time Project setup
+```text
+<!-- coordinator = {"lock_owner":"<machine>:<session>:<worker>","lock_expires_at":"2026-04-16T18:45:00Z","blocked_by":[42,57]} -->
+```
 
-Create these two custom fields on your Project v2:
+HTML comments are stripped by GitHub's Markdown renderer but returned raw through the API, so the
+marker is invisible to humans reading the PR while still being machine-readable. The plugin only
+touches this single line; the user-authored body above it is preserved.
 
-| Field name        | Type | Purpose                                                              |
-|-------------------|------|----------------------------------------------------------------------|
-| `lock_owner`      | Text | `<machine-id>:<orchestrator-session-id>:<worker-agent-id>`. Empty = unlocked. |
-| `lock_expires_at` | Text | ISO-8601 UTC timestamp, e.g. `2026-04-16T18:45:00Z`. Lexicographic `< now` = stale, reclaimable. Must be Text (not Date) — Project v2 Date is day-granular, too coarse for real-time locks. |
-
-The plugin's first-run check verifies both fields exist and errors out cleanly if missing.
+> **Don't edit the marker line manually during active dispatch.** If you need to edit the PR body
+> while a worker is running, pause the orchestrator first (or let the lock expire) to avoid a race
+> that might overwrite your edit.
 
 ## Configuration
 
@@ -84,12 +77,15 @@ Per-user local config at `.claude/coordinator.local.md`:
 
 ```markdown
 ---
-project_id: PVT_kwDOxxxxxxxxxxx  # Project v2 node ID
-project_owner: my-org             # or user login
-project_number: 42                # Project number
-default_lease_minutes: 15         # lock lease for new work
+repos:
+  - cjhowe-us/coordinator-sandbox
+  - cjhowe-us/workflow
+default_lease_minutes: 15   # how long a newly-acquired lock lasts
 ---
 ```
+
+The `repos:` list is the scan scope. Any draft PR in one of these repos that carries a
+`phase:<name>` label is considered managed.
 
 ## Usage
 
@@ -99,7 +95,8 @@ claude --agent coordinator
 
 Or invoke the `/coordinator` skill from within a Claude Code session.
 
-The orchestrator runs as an **interactive-only** agent (`disable-model-invocation: true`) — it cannot be spawned automatically by other agents.
+The orchestrator runs as an **interactive-only** agent (`disable-model-invocation: true`) — it
+cannot be spawned automatically by other agents.
 
 ## Environment overrides
 
@@ -125,13 +122,12 @@ cd coordinator/tests
 python3 -m pytest -v
 ```
 
-These run entirely inside the current Claude conversation — no external SDK, no API key, no network.
-A Python shim on `PATH` fakes `gh api graphql` so the real `lock-acquire.sh`, `lock-release.sh`,
-`lock-heartbeat.sh`, and `project-query.sh` scripts can be exercised against an in-memory Project
-v2.
+A Python shim on `PATH` fakes the subset of `gh` the plugin uses (`pr list`, `pr view`, `pr edit`,
+`pr create`, `label create`, `repo view`) against an in-memory repo map. Offline — no network, no
+API key.
 
 End-to-end behavior of the orchestrator is verified the same way users run it: start a Claude Code
-session with `claude --agent coordinator`, point it at a test Project, and observe the dispatch
+session with `claude --agent coordinator`, point it at a test repo, and observe the dispatch
 directly in that conversation.
 
 See `/Users/cjhowe/.claude/plans/the-idea-is-that-delightful-fiddle.md` for the overall verification

@@ -1,98 +1,71 @@
 #!/usr/bin/env bash
-# Release a Project v2 lock on one item, or bulk-release all items held by a given owner.
+# Release the coordinator lock on a pull request by stripping its HTML-comment
+# marker from the PR body. Idempotent.
 #
-# Usage A (one item): lock-release.sh \
-#   --project <PID> --item <ITEM_ID> \
-#   --owner-field <FID> --expiry-field <FID>
+# Usage:
+#   lock-release.sh --repo <owner/name> --pr <N>
+#       Strip the marker regardless of owner. Used on graceful worker finish.
 #
-# Usage B (bulk by owner): lock-release.sh \
-#   --project <PID> --owner-matches <LOCK_OWNER_STRING>
-#
-# Idempotent; always exits 0 unless invoked incorrectly.
+#   lock-release.sh --repo <owner/name> --pr <N> --expected-owner <string>
+#       Strip only if the current marker's lock_owner matches. Used by the
+#       SubagentStop hook to avoid stomping a concurrent worker's lock.
 set -euo pipefail
 
-PROJECT=""; ITEM=""; OWNER_FIELD=""; EXPIRY_FIELD=""; OWNER_MATCH=""
+REPO=""; PR=""; EXPECTED_OWNER=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --project)        PROJECT="$2"; shift 2;;
-    --item)           ITEM="$2"; shift 2;;
-    --owner-field)    OWNER_FIELD="$2"; shift 2;;
-    --expiry-field)   EXPIRY_FIELD="$2"; shift 2;;
-    --owner-matches)  OWNER_MATCH="$2"; shift 2;;
+    --repo)            REPO="$2";           shift 2;;
+    --pr)              PR="$2";             shift 2;;
+    --expected-owner)  EXPECTED_OWNER="$2"; shift 2;;
     *) echo "unknown arg: $1" >&2; exit 2;;
   esac
 done
-[[ -n "$PROJECT" ]] || { echo "--project required" >&2; exit 2; }
+for v in REPO PR; do
+  [[ -n "${!v}" ]] || { echo "$v required" >&2; exit 2; }
+done
 
-resolve_field_ids() {
-  gh api graphql -f query='
-    query($project: ID!) {
-      node(id: $project) {
-        ... on ProjectV2 {
-          fields(first: 50) {
-            nodes { ... on ProjectV2Field { id name } }
-          }
-        }
-      }
-    }
-  ' -f project="$PROJECT" | jq -r '
-    .data.node.fields.nodes
-    | map(select(.name == "lock_owner" or .name == "lock_expires_at"))
-    | map([.name, .id]) | .[] | @tsv
-  '
+read_body() {
+  gh pr view "$PR" --repo "$REPO" --json body -q '.body' 2>/dev/null || true
 }
 
-if [[ -z "$OWNER_FIELD" || -z "$EXPIRY_FIELD" ]]; then
-  while IFS=$'\t' read -r name fid; do
-    [[ "$name" == "lock_owner" ]]     && OWNER_FIELD="$fid"
-    [[ "$name" == "lock_expires_at" ]] && EXPIRY_FIELD="$fid"
-  done < <(resolve_field_ids)
-fi
-
-[[ -n "$OWNER_FIELD" && -n "$EXPIRY_FIELD" ]] \
-  || { echo "could not resolve lock field IDs on project" >&2; exit 2; }
-
-clear_one() {
-  local item_id="$1"
-  gh api graphql -f query='
-    mutation($project: ID!, $item: ID!, $ownerField: ID!, $expiryField: ID!) {
-      clearOwner: updateProjectV2ItemFieldValue(input: {
-        projectId: $project, itemId: $item, fieldId: $ownerField,
-        value: { text: "" }
-      }) { clientMutationId }
-      clearExpiry: updateProjectV2ItemFieldValue(input: {
-        projectId: $project, itemId: $item, fieldId: $expiryField,
-        value: { text: "" }
-      }) { clientMutationId }
-    }
-  ' -f project="$PROJECT" -f item="$item_id" \
-    -f ownerField="$OWNER_FIELD" -f expiryField="$EXPIRY_FIELD" >/dev/null || true
+extract_marker_json() {
+  printf '%s' "$1" | awk '
+    /^<!-- coordinator = \{.*\} -->$/ {
+      sub(/^<!-- coordinator = /, "")
+      sub(/ -->$/, "")
+      print
+      exit
+    }'
 }
 
-if [[ -n "$ITEM" ]]; then
-  clear_one "$ITEM"
-  echo "{\"released\":\"$ITEM\"}"
+strip_marker() {
+  printf '%s' "$1" | awk '
+    !/^<!-- coordinator = \{.*\} -->$/ { print }'
+}
+
+body=$(read_body)
+cur_json=$(extract_marker_json "$body")
+
+# No marker — already released.
+if [[ -z "$cur_json" ]]; then
+  printf '{"released":false,"pr_number":%s,"repo":"%s","reason":"no-marker"}\n' "$PR" "$REPO"
   exit 0
 fi
 
-if [[ -n "$OWNER_MATCH" ]]; then
-  scan="$(dirname "$0")/project-query.sh"
-  [[ -x "$scan" ]] || { echo "project-query.sh missing" >&2; exit 2; }
-
-  cleared=0
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    owner=$(echo "$line" | jq -r '.lock_owner // ""')
-    item_id=$(echo "$line" | jq -r '.item_id // ""')
-    if [[ -n "$item_id" && "$owner" == *"$OWNER_MATCH"* ]]; then
-      clear_one "$item_id"
-      cleared=$((cleared + 1))
-    fi
-  done < <("$scan" "$PROJECT")
-
-  echo "{\"released_count\":$cleared}"
-  exit 0
+# Optional owner check — skip release if another worker now holds the lock.
+if [[ -n "$EXPECTED_OWNER" ]]; then
+  cur_owner=$(printf '%s' "$cur_json" | jq -r '.lock_owner // ""')
+  if [[ "$cur_owner" != "$EXPECTED_OWNER" ]]; then
+    printf '{"released":false,"pr_number":%s,"repo":"%s","reason":"owner-mismatch","current_owner":"%s"}\n' \
+      "$PR" "$REPO" "$cur_owner"
+    exit 0
+  fi
 fi
 
-echo "either --item or --owner-matches required" >&2
-exit 2
+stripped=$(strip_marker "$body")
+# Trim a single trailing blank line left behind by stripping the marker block.
+stripped="${stripped%$'\n'}"
+
+printf '%s\n' "$stripped" | gh pr edit "$PR" --repo "$REPO" --body-file - >/dev/null
+
+printf '{"released":true,"pr_number":%s,"repo":"%s"}\n' "$PR" "$REPO"

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# SubagentStop / TaskCompleted: clear Project v2 lock_owner + lock_expires_at for any items
-# whose lock_owner matches the stopped worker's id. Idempotent — safe to run when no lock held.
+# SubagentStop / TaskCompleted: release any PR locks held by the stopped
+# coordinator-worker by scanning each configured repo and clearing markers
+# whose lock_owner matches the stopped worker's id. Idempotent.
 set -euo pipefail
 
 INPUT=$(cat 2>/dev/null || true)
@@ -13,7 +14,7 @@ fi
 agent_id=$(echo "$INPUT" | jq -r '.agent_id // .subagent_id // .task_id // empty')
 [[ -z "$agent_id" ]] && { printf '%s\n' '{}'; exit 0; }
 
-# Skip if not a coordinator worker (match subagent_type)
+# Skip if not a coordinator worker.
 subagent_type=$(echo "$INPUT" | jq -r '.subagent_type // .agent_type // empty')
 if [[ -n "$subagent_type" && "$subagent_type" != "coordinator-worker" ]]; then
   printf '%s\n' '{}'
@@ -25,13 +26,37 @@ cwd=$(echo "$INPUT" | jq -r '.cwd // empty')
 cfg="$cwd/.claude/coordinator.local.md"
 [[ -f "$cfg" ]] || { printf '%s\n' '{}'; exit 0; }
 
-project_id=$(awk -F': *' '/^project_id:/ { print $2; exit }' "$cfg" | tr -d '"' | tr -d "'")
-[[ -z "$project_id" ]] && { printf '%s\n' '{}'; exit 0; }
+# Parse repos list (`- owner/name` under `repos:`) from YAML frontmatter.
+mapfile -t repos < <(awk '
+  /^---/ { fm = !fm; next }
+  !fm { next }
+  /^repos:/ { in_repos = 1; next }
+  in_repos && /^[^ ]/ { in_repos = 0 }
+  in_repos && /^[[:space:]]*-[[:space:]]*/ {
+    sub(/^[[:space:]]*-[[:space:]]*/, "")
+    gsub(/"/, ""); gsub(/'\''/, "")
+    print
+  }
+' "$cfg")
+(( ${#repos[@]} )) || { printf '%s\n' '{}'; exit 0; }
 
-# Find and clear matching items (best-effort; on error, emit empty JSON)
-if ! "${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}/scripts/lock-release.sh" \
-    --project "$project_id" --owner-matches "$agent_id" 2>/dev/null; then
-  :
-fi
+plugin_root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+
+# Scan each repo and release any PRs whose marker owner matches this agent.
+cleared=0
+for repo in "${repos[@]}"; do
+  while IFS= read -r rec; do
+    [[ -z "$rec" ]] && continue
+    owner=$(echo "$rec" | jq -r '.lock_owner // ""')
+    pr_num=$(echo "$rec" | jq -r '.number // empty')
+    [[ -z "$pr_num" ]] && continue
+    if [[ "$owner" == *"$agent_id"* ]]; then
+      "$plugin_root/scripts/lock-release.sh" \
+        --repo "$repo" --pr "$pr_num" --expected-owner "$owner" \
+        >/dev/null 2>&1 || true
+      cleared=$((cleared + 1))
+    fi
+  done < <("$plugin_root/scripts/pr-scan.sh" "$repo" 2>/dev/null || true)
+done
 
 printf '%s\n' '{}'

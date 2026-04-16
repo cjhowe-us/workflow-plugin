@@ -1,62 +1,81 @@
-# Extend a Project v2 lock's lock_expires_at. Caller must already hold the lock.
+# Extend the lock_expires_at on a pull request's marker. Caller must already
+# hold the lock; the current lock_owner is verified before writing.
 #
 # Usage:
 #   pwsh -NoProfile -File lock-heartbeat.ps1 `
-#     -Project <PID> -Item <ITEM_ID> `
-#     -ExpiryField <FID> -ExpiresAt <YYYY-MM-DDTHH:MM:SSZ> `
-#     [-OwnerField <FID> -ExpectedOwner <OWNER>]
+#       -Repo <owner/name> -Pr <N> `
+#       -ExpectedOwner <string> -ExpiresAt <YYYY-MM-DDTHH:MM:SSZ>
 #
-# If -OwnerField and -ExpectedOwner are given, verifies current owner first;
-# exits 1 if the lock has been stolen.
+# Exit 0 on success, 1 if the lock has been stolen (owner mismatch or marker
+# missing), 2 on usage error.
 
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)] [string]$Project,
-  [Parameter(Mandatory = $true)] [string]$Item,
-  [Parameter(Mandatory = $true)] [string]$ExpiryField,
-  [Parameter(Mandatory = $true)] [string]$ExpiresAt,
-  [string]$OwnerField,
-  [string]$ExpectedOwner
+  [Parameter(Mandatory = $true)] [string]$Repo,
+  [Parameter(Mandatory = $true)] [int]$Pr,
+  [Parameter(Mandatory = $true)] [string]$ExpectedOwner,
+  [Parameter(Mandatory = $true)] [string]$ExpiresAt
 )
 
 $ErrorActionPreference = 'Stop'
+$markerRegex = '(?m)^<!-- coordinator = (\{.*\}) -->$'
 
-if ($OwnerField -and $ExpectedOwner) {
-  $q = @'
-query($item: ID!) {
-  node(id: $item) {
-    ... on ProjectV2Item {
-      fieldValues(first: 50) {
-        nodes {
-          ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2Field { name } } }
-        }
-      }
-    }
-  }
-}
-'@
-  $resp = & gh api graphql -f "query=$q" -f "item=$Item" | ConvertFrom-Json -Depth 20
-  $curOwner = ($resp.data.node.fieldValues.nodes |
-    Where-Object { $_.field.name -eq 'lock_owner' } |
-    Select-Object -First 1).text
-  if ($null -eq $curOwner) { $curOwner = '' }
-  if ($curOwner -ne $ExpectedOwner) {
-    Write-Error "stolen: current owner is '$curOwner' (expected '$ExpectedOwner')"
-    exit 1
-  }
+function Read-PrBody {
+  $out = & gh pr view $Pr --repo $Repo --json body -q '.body' 2>$null
+  if ($null -eq $out) { return '' }
+  return [string]$out
 }
 
-$mut = @'
-mutation($project: ID!, $item: ID!, $expiryField: ID!, $expiry: String!) {
-  updateProjectV2ItemFieldValue(input: {
-    projectId: $project, itemId: $item, fieldId: $expiryField, value: { text: $expiry }
-  }) { clientMutationId }
+function Extract-MarkerJson {
+  param([string]$Body)
+  $m = [regex]::Match($Body, $markerRegex)
+  if ($m.Success) { return $m.Groups[1].Value }
+  return ''
 }
-'@
 
-& gh api graphql `
-  -f "query=$mut" `
-  -f "project=$Project" -f "item=$Item" `
-  -f "expiryField=$ExpiryField" -f "expiry=$ExpiresAt" | Out-Null
+function Strip-Marker {
+  param([string]$Body)
+  return [regex]::Replace($Body, "$markerRegex\r?\n?", '')
+}
 
-[ordered]@{ heartbeat = 'ok'; expires_at = $ExpiresAt } | ConvertTo-Json -Compress
+$body    = Read-PrBody
+$curJson = Extract-MarkerJson -Body $body
+if (-not $curJson) {
+  Write-Error "stolen: marker missing on PR #$Pr"
+  exit 1
+}
+
+$obj      = $curJson | ConvertFrom-Json
+$curOwner = [string]$obj.lock_owner
+if ($curOwner -ne $ExpectedOwner) {
+  Write-Error "stolen: current owner is '$curOwner' (expected '$ExpectedOwner')"
+  exit 1
+}
+
+$blockedBy = @()
+if ($obj.blocked_by) { $blockedBy = @($obj.blocked_by) }
+
+$newObj = [ordered]@{
+  lock_owner      = $ExpectedOwner
+  lock_expires_at = $ExpiresAt
+  blocked_by      = $blockedBy
+}
+$newJson   = $newObj | ConvertTo-Json -Compress -Depth 10
+$newMarker = "<!-- coordinator = $newJson -->"
+
+$stripped = Strip-Marker -Body $body
+$stripped = $stripped.TrimEnd("`n", "`r")
+if ($stripped) {
+  $newBody = "$stripped`n`n$newMarker"
+} else {
+  $newBody = $newMarker
+}
+
+$newBody | & gh pr edit $Pr --repo $Repo --body-file - | Out-Null
+
+[ordered]@{
+  heartbeat  = 'ok'
+  expires_at = $ExpiresAt
+  pr_number  = $Pr
+  repo       = $Repo
+} | ConvertTo-Json -Compress

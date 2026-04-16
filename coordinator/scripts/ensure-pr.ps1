@@ -4,19 +4,15 @@
 # title + body carry the work description and the phase label.
 #
 # Usage:
-#   pwsh -NoProfile -File ensure-pr.ps1 -Repo <owner/name> -Pr <M> [-Project <PVT_...>]
-#       Returns metadata for an existing PR. If -Project is given, idempotently
-#       adds the PR to the project.
+#   pwsh -NoProfile -File ensure-pr.ps1 -Repo <owner/name> -Pr <M>
+#       Returns metadata for an existing PR.
 #
 #   pwsh -NoProfile -File ensure-pr.ps1 -Repo <owner/name> -Title "..." `
 #       -Phase specify|design|plan|implement|release|docs `
-#       [-Branch <name>] [-Base <default-branch>] [-Body "..."] [-Project <PVT_...>]
+#       [-Branch <name>] [-Base <default-branch>] [-Body "..."]
 #       Creates a new draft PR. Branch defaults to coordinator/<phase>-<slug>.
-#       If -Project is given, adds the newly-created PR to the project so the
-#       orchestrator sees it on the next dispatch pass.
 #
-# Emits JSON: { "pr_number": N, "branch": "...", "phase": "...", "created_pr": bool,
-#               "project_item_id": "..." | null }
+# Emits JSON: { "pr_number": N, "branch": "...", "phase": "...", "created_pr": bool }
 
 [CmdletBinding()]
 param(
@@ -27,31 +23,10 @@ param(
   [string]$Phase,
   [string]$Branch,
   [string]$Base,
-  [string]$Body,
-  [string]$Project
+  [string]$Body
 )
 
 $ErrorActionPreference = 'Stop'
-
-function Add-PrToProject {
-  param([string]$ProjectId, [int]$PrNumber, [string]$RepoName)
-  $prNodeId = & gh pr view $PrNumber --repo $RepoName --json id -q '.id' 2>$null
-  if (-not $prNodeId) { return '' }
-  $q = @'
-mutation($project: ID!, $pr: ID!) {
-  addProjectV2ItemById(input: {projectId: $project, contentId: $pr}) {
-    item { id }
-  }
-}
-'@
-  try {
-    $resp = & gh api graphql -f "query=$q" -f "project=$ProjectId" -f "pr=$prNodeId" 2>$null |
-      ConvertFrom-Json -Depth 20
-    return $resp.data.addProjectV2ItemById.item.id
-  } catch {
-    return ''
-  }
-}
 
 # Existing PR — echo metadata and return.
 if ($PSBoundParameters.ContainsKey('Pr') -and $Pr -gt 0) {
@@ -61,14 +36,11 @@ if ($PSBoundParameters.ContainsKey('Pr') -and $Pr -gt 0) {
   foreach ($l in $resp.labels) {
     if ($l.name -like 'phase:*') { $existingPhase = $l.name.Substring(6); break }
   }
-  $itemId = ''
-  if ($Project) { $itemId = Add-PrToProject -ProjectId $Project -PrNumber $Pr -RepoName $Repo }
   [ordered]@{
-    pr_number       = $Pr
-    branch          = $resp.headRefName
-    phase           = $existingPhase
-    created_pr      = $false
-    project_item_id = $(if ($itemId) { $itemId } else { $null })
+    pr_number  = $Pr
+    branch     = $resp.headRefName
+    phase      = $existingPhase
+    created_pr = $false
   } | ConvertTo-Json -Compress
   exit 0
 }
@@ -113,13 +85,9 @@ try {
 } catch { }
 & gh pr edit $prNum --repo $Repo --add-label "phase:$Phase" | Out-Null
 
-$itemId = ''
-if ($Project) { $itemId = Add-PrToProject -ProjectId $Project -PrNumber $prNum -RepoName $Repo }
-
 [ordered]@{
-  pr_number       = $prNum
-  branch          = $Branch
-  phase           = $Phase
-  created_pr      = $true
-  project_item_id = $(if ($itemId) { $itemId } else { $null })
+  pr_number  = $prNum
+  branch     = $Branch
+  phase      = $Phase
+  created_pr = $true
 } | ConvertTo-Json -Compress

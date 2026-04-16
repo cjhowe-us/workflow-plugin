@@ -1,14 +1,13 @@
 """Fixtures for the coordinator test suite.
 
-`fake_gh` — writes a Python shim on PATH that mimics a small subset of the
-`gh` CLI against an in-memory Project v2. The tests run offline and live
-entirely inside a single Claude conversation; no cloud SDK, no API key.
+`fake_gh` — writes a Python shim on PATH that mimics the subset of the
+`gh` CLI the plugin actually uses (pr view/edit/create/list, label create,
+repo view) against an in-memory repo map. Offline; no network, no API key.
 """
 from __future__ import annotations
 
 import json
 import os
-import shutil
 import stat
 import subprocess
 import textwrap
@@ -20,37 +19,45 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = PLUGIN_ROOT / "scripts"
 
 
-# ---------------------------------------------------------------------------
-# Smoke fixtures
-# ---------------------------------------------------------------------------
-
 @pytest.fixture
 def fake_gh(tmp_path, monkeypatch):
-    """Install a fake `gh` binary that reads/writes a JSON state file.
+    """Install a fake `gh` binary backed by a JSON state file.
 
-    The state file models a single Project v2 with N items, each having the
-    two Text fields `lock_owner` and `lock_expires_at`. Mutations emitted by
-    `lock-acquire.sh` / `lock-release.sh` / `lock-heartbeat.sh` are parsed
-    and applied to this in-memory state. Queries read from it.
+    State schema:
+      {
+        "repos": {
+          "owner/name": {
+            "default_branch": "main",
+            "next_pr_number": 1,
+            "labels": ["phase:specify", ...],
+            "prs": {
+              "<N>": {
+                "number": N,
+                "state": "OPEN" | "CLOSED" | "MERGED",
+                "isDraft": true | false,
+                "headRefName": "...",
+                "title": "...",
+                "body": "...",
+                "labels": [{"name": "phase:..."}]
+              }
+            }
+          }
+        }
+      }
 
-    Yields the `(bin_dir, state_path)` pair so tests can read the state back.
+    Yields `(bin_dir, state_path)`. Tests call `seed_repo` / `seed_pr` /
+    `read_pr` to drive.
     """
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
 
-    state_path = tmp_path / "project-state.json"
-    state_path.write_text(json.dumps({
-        "fields": {
-            "lock_owner": "F_lockOwner",
-            "lock_expires_at": "F_lockExpiresAt",
-        },
-        "items": {},
-    }))
+    state_path = tmp_path / "gh-state.json"
+    state_path.write_text(json.dumps({"repos": {}}))
 
     fake_gh_py = bin_dir / "gh"
     fake_gh_py.write_text(textwrap.dedent(f"""
         #!/usr/bin/env python3
-        import json, os, re, sys
+        import json, os, sys
         STATE = {json.dumps(str(state_path))!s}
 
         def load(): return json.loads(open(STATE).read())
@@ -58,98 +65,182 @@ def fake_gh(tmp_path, monkeypatch):
 
         def flag(name):
             if name in sys.argv:
-                i = sys.argv.index(name); return sys.argv[i + 1]
+                i = sys.argv.index(name)
+                if i + 1 < len(sys.argv):
+                    return sys.argv[i + 1]
             return None
 
+        def get_repo(state, name):
+            return state["repos"].setdefault(name, {{
+                "default_branch": "main",
+                "next_pr_number": 1,
+                "labels": [],
+                "prs": {{}},
+            }})
+
+        def repo_from_flag(state):
+            r = flag("--repo")
+            if not r:
+                sys.stderr.write("fake gh: --repo required\\n"); sys.exit(2)
+            return r, get_repo(state, r)
+
+        def json_fields(raw, pr):
+            fields = raw.split(",") if raw else []
+            out = {{}}
+            for f in fields:
+                if f == "labels":
+                    out[f] = pr.get("labels", [])
+                elif f == "body":
+                    out[f] = pr.get("body", "")
+                else:
+                    out[f] = pr.get(f)
+            return out
+
+        def apply_jq_q(obj, q):
+            if not q or q == ".":
+                return obj
+            # Minimal jq support: ".field" and ".field.field"
+            cur = obj
+            for part in q.lstrip(".").split("."):
+                if part == "":
+                    continue
+                if isinstance(cur, dict):
+                    cur = cur.get(part)
+                else:
+                    return None
+            return cur
+
         args = sys.argv[1:]
-        if args[:2] != ["api", "graphql"]:
-            sys.stderr.write(f"fake gh: unsupported subcommand: {{args!r}}\\n")
-            sys.exit(2)
-
-        query = flag("-f").split("=", 1)[1] if flag("-f") else ""
-        # Real gh accepts many -f; grab them all as a dict.
-        params = {{}}
-        for i, tok in enumerate(sys.argv):
-            if tok == "-f" and i + 1 < len(sys.argv):
-                k, _, v = sys.argv[i + 1].partition("=")
-                params[k] = v
-
-        q = params.get("query", "")
         state = load()
 
-        # --- Read fields on project -----------------------------------------
-        if "fields(first:" in q and "ProjectV2Field" in q:
-            print(json.dumps({{
-                "data": {{"node": {{"fields": {{"nodes": [
-                    {{"id": fid, "name": name}}
-                    for name, fid in state["fields"].items()
-                ]}}}}}}
-            }}))
-            sys.exit(0)
-
-        # --- Read one item's field values -----------------------------------
-        if "ProjectV2Item" in q and "fieldValues" in q and "project" not in params:
-            item_id = params.get("item")
-            itm = state["items"].setdefault(item_id, {{"lock_owner": "", "lock_expires_at": ""}})
-            print(json.dumps({{
-                "data": {{"node": {{"fieldValues": {{"nodes": [
-                    {{"text": itm["lock_owner"], "field": {{"name": "lock_owner"}}}},
-                    {{"text": itm["lock_expires_at"], "field": {{"name": "lock_expires_at"}}}},
-                ]}}}}}}
-            }}))
-            sys.exit(0)
-
-        # --- List project items (full scan) ---------------------------------
-        if "items(first:" in q and "ProjectV2Item" not in q.split("items(first:")[0]:
-            nodes = []
-            for iid, fields in state["items"].items():
-                # smoke harness assumes PR items by default
-                c = fields.get("_content") or {{
-                    "__typename": "PullRequest",
-                    "number": int(iid.split(":")[-1]) if ":" in iid else 1,
-                    "state": "OPEN",
-                    "isDraft": True,
-                    "repository": {{"nameWithOwner": "test/repo"}},
-                    "headRefName": fields.get("_branch") or "coordinator/test",
-                    "labels": {{"nodes": [{{"name": "phase:specify"}}]}},
-                }}
-                nodes.append({{
-                    "id": iid,
-                    "content": c,
-                    "fieldValues": {{"nodes": [
-                        {{"__typename": "ProjectV2ItemFieldTextValue",
-                         "text": fields["lock_owner"], "field": {{"name": "lock_owner"}}}},
-                        {{"__typename": "ProjectV2ItemFieldTextValue",
-                         "text": fields["lock_expires_at"], "field": {{"name": "lock_expires_at"}}}},
-                    ]}},
-                }})
-            print(json.dumps({{
-                "data": {{"node": {{"items": {{
-                    "pageInfo": {{"hasNextPage": False, "endCursor": None}},
-                    "nodes": nodes,
-                }}}}}}
-            }}))
-            sys.exit(0)
-
-        # --- Mutation: updateProjectV2ItemFieldValue (one or two aliases) ---
-        if "updateProjectV2ItemFieldValue" in q:
-            item_id = params.get("item")
-            itm = state["items"].setdefault(item_id, {{"lock_owner": "", "lock_expires_at": ""}})
-            owner_fid  = state["fields"]["lock_owner"]
-            expiry_fid = state["fields"]["lock_expires_at"]
-            # The mutation body references $ownerField / $expiryField; look up which
-            # field ID was bound to which variable and apply the corresponding value.
-            # Missing `owner`/`expiry` param => the query body carries
-            # `value: {{ text: "" }}` inline, i.e. this is a clear mutation.
-            if params.get("ownerField") == owner_fid:
-                itm["lock_owner"] = params.get("owner", "")
-            if params.get("expiryField") == expiry_fid:
-                itm["lock_expires_at"] = params.get("expiry", "")
+        # --- gh repo view -------------------------------------------------
+        if args[:2] == ["repo", "view"] and len(args) >= 3 and not args[2].startswith("-"):
+            # args[2] is "owner/name"
+            r = args[2]
+            info = get_repo(state, r)
             save(state)
-            print(json.dumps({{"data": {{"clientMutationId": None}}}}))
+            raw = flag("--json") or ""
+            q = flag("-q") or ""
+            if "defaultBranchRef" in raw:
+                payload = {{"defaultBranchRef": {{"name": info["default_branch"]}}}}
+            else:
+                payload = {{}}
+            if q:
+                v = apply_jq_q(payload, q)
+                print(v if v is not None else "")
+            else:
+                print(json.dumps(payload))
             sys.exit(0)
 
-        sys.stderr.write(f"fake gh: unhandled graphql query: {{q[:120]!r}}\\n")
+        # --- gh pr view ---------------------------------------------------
+        if args[:2] == ["pr", "view"] and len(args) >= 3:
+            num = int(args[2])
+            repo_name, repo = repo_from_flag(state)
+            pr = repo["prs"].get(str(num))
+            if not pr:
+                sys.stderr.write(f"fake gh: no PR #{{num}} in {{repo_name}}\\n"); sys.exit(1)
+            raw = flag("--json")
+            q = flag("-q") or ""
+            payload = json_fields(raw, pr)
+            if q:
+                v = apply_jq_q(payload, q)
+                if v is None:
+                    print("")
+                elif isinstance(v, (dict, list)):
+                    print(json.dumps(v))
+                else:
+                    print(v)
+            else:
+                print(json.dumps(payload))
+            sys.exit(0)
+
+        # --- gh pr list ---------------------------------------------------
+        if args[:2] == ["pr", "list"]:
+            repo_name, repo = repo_from_flag(state)
+            raw = flag("--json") or ""
+            fields = raw.split(",") if raw else []
+            want_state = flag("--state") or "open"
+            out = []
+            for pr in repo["prs"].values():
+                if want_state != "all" and pr.get("state", "").lower() != want_state.lower():
+                    continue
+                row = {{}}
+                for f in fields:
+                    if f == "labels":
+                        row[f] = pr.get("labels", [])
+                    elif f == "body":
+                        row[f] = pr.get("body", "")
+                    else:
+                        row[f] = pr.get(f)
+                out.append(row)
+            print(json.dumps(out))
+            sys.exit(0)
+
+        # --- gh pr edit ---------------------------------------------------
+        if args[:2] == ["pr", "edit"] and len(args) >= 3:
+            num = int(args[2])
+            repo_name, repo = repo_from_flag(state)
+            pr = repo["prs"].get(str(num))
+            if not pr:
+                sys.stderr.write(f"fake gh: no PR #{{num}} in {{repo_name}}\\n"); sys.exit(1)
+            # --body-file <path-or-dash>
+            body_file = flag("--body-file")
+            if body_file == "-":
+                pr["body"] = sys.stdin.read()
+                # gh strips trailing newlines on --body-file; mimic that.
+                pr["body"] = pr["body"].rstrip("\\n")
+            elif body_file:
+                pr["body"] = open(body_file).read().rstrip("\\n")
+            add_label = flag("--add-label")
+            if add_label:
+                labels = pr.setdefault("labels", [])
+                if not any(l.get("name") == add_label for l in labels):
+                    labels.append({{"name": add_label}})
+            save(state)
+            sys.exit(0)
+
+        # --- gh pr create -------------------------------------------------
+        if args[:2] == ["pr", "create"]:
+            repo_name, repo = repo_from_flag(state)
+            title = flag("--title") or "untitled"
+            body  = flag("--body")  or ""
+            head  = flag("--head")  or "branch"
+            base  = flag("--base")  or repo["default_branch"]
+            draft = "--draft" in args
+            num = repo["next_pr_number"]
+            repo["next_pr_number"] += 1
+            repo["prs"][str(num)] = {{
+                "number": num,
+                "state": "OPEN",
+                "isDraft": draft,
+                "headRefName": head,
+                "title": title,
+                "body": body,
+                "labels": [],
+            }}
+            save(state)
+            print(f"https://github.com/{{repo_name}}/pull/{{num}}")
+            sys.exit(0)
+
+        # --- gh label create ---------------------------------------------
+        if args[:2] == ["label", "create"]:
+            repo_name, repo = repo_from_flag(state)
+            # Positional label name is the first non-flag arg after `label create`.
+            name = None
+            i = 2
+            while i < len(args):
+                tok = args[i]
+                if tok.startswith("--"):
+                    i += 2
+                    continue
+                name = tok
+                break
+            if name and name not in repo["labels"]:
+                repo["labels"].append(name)
+            save(state)
+            sys.exit(0)
+
+        sys.stderr.write(f"fake gh: unhandled subcommand: {{args!r}}\\n")
         sys.exit(3)
     """).lstrip())
     fake_gh_py.chmod(fake_gh_py.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
@@ -159,18 +250,50 @@ def fake_gh(tmp_path, monkeypatch):
     yield bin_dir, state_path
 
 
-def seed_item(state_path: Path, item_id: str, *, owner: str = "", expires_at: str = "",
-              content: dict | None = None) -> None:
-    state = json.loads(state_path.read_text())
-    state["items"][item_id] = {
-        "lock_owner": owner,
-        "lock_expires_at": expires_at,
-        "_content": content,
-    }
+def _load(state_path: Path) -> dict:
+    return json.loads(state_path.read_text())
+
+
+def _save(state_path: Path, state: dict) -> None:
     state_path.write_text(json.dumps(state, indent=2))
 
 
-def read_item(state_path: Path, item_id: str) -> dict:
-    return json.loads(state_path.read_text())["items"].get(item_id, {})
+def seed_repo(state_path: Path, repo: str, *, default_branch: str = "main") -> None:
+    state = _load(state_path)
+    state.setdefault("repos", {})[repo] = {
+        "default_branch": default_branch,
+        "next_pr_number": 1,
+        "labels": [],
+        "prs": {},
+    }
+    _save(state_path, state)
 
 
+def seed_pr(state_path: Path, repo: str, number: int, **kwargs) -> None:
+    state = _load(state_path)
+    r = state["repos"].setdefault(repo, {
+        "default_branch": "main",
+        "next_pr_number": number + 1,
+        "labels": [],
+        "prs": {},
+    })
+    defaults = {
+        "number": number,
+        "state": "OPEN",
+        "isDraft": True,
+        "headRefName": f"coordinator/test-{number}",
+        "title": f"Test PR #{number}",
+        "body": "",
+        "labels": [],
+    }
+    defaults.update(kwargs)
+    # Accept plain strings for labels list and coerce.
+    if defaults["labels"] and isinstance(defaults["labels"][0], str):
+        defaults["labels"] = [{"name": n} for n in defaults["labels"]]
+    r["prs"][str(number)] = defaults
+    r["next_pr_number"] = max(r["next_pr_number"], number + 1)
+    _save(state_path, state)
+
+
+def read_pr(state_path: Path, repo: str, number: int) -> dict:
+    return _load(state_path)["repos"][repo]["prs"][str(number)]

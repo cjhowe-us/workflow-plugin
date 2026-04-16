@@ -5,7 +5,7 @@
 # non-zero = fail.
 #
 # Usage:
-#   pwsh -NoProfile -File coordinator/tests/test-parity.ps1
+#   pwsh -NoProfile -File env-setup/tests/test-parity.ps1
 
 [CmdletBinding()]
 param()
@@ -17,9 +17,8 @@ $pluginRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $failures = New-Object System.Collections.Generic.List[string]
 $checked  = 0
 
-# The parity test itself is pwsh-only by nature (uses
-# System.Management.Automation.Language.Parser). Exclude it — and any
-# other opt-outs listed here — from the bidirectional check.
+# The parity test itself is pwsh-only by nature. Exclude it from the
+# bidirectional check.
 $excludeBasenames = @('test-parity.ps1', 'test-parity.sh')
 
 $shFiles = Get-ChildItem -Path $pluginRoot -Filter '*.sh' -File -Recurse |
@@ -32,8 +31,6 @@ foreach ($sh in $shFiles) {
     continue
   }
 
-  # Basic parse check: tokenize + parse the PowerShell file. Any parse
-  # errors fail.
   $tokens = $null
   $parseErrors = $null
   [void][System.Management.Automation.Language.Parser]::ParseFile(

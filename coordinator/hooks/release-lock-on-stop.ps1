@@ -1,5 +1,7 @@
-# SubagentStop / TaskCompleted hook (PowerShell). Clears Project v2 lock fields
-# for any items whose lock_owner matches the stopped worker's id. Idempotent.
+# SubagentStop / TaskCompleted hook (PowerShell). Releases any PR locks held
+# by the stopped coordinator-worker by scanning each configured repo and
+# clearing markers whose lock_owner matches the stopped worker's id.
+# Idempotent.
 
 [CmdletBinding()]
 param()
@@ -25,7 +27,7 @@ if (-not $agentId) { $agentId = $payload.subagent_id }
 if (-not $agentId) { $agentId = $payload.task_id }
 if (-not $agentId) { '{}'; exit 0 }
 
-# Skip if not a coordinator worker
+# Skip if not a coordinator worker.
 $subagentType = $payload.subagent_type
 if (-not $subagentType) { $subagentType = $payload.agent_type }
 if ($subagentType -and $subagentType -ne 'coordinator-worker') { '{}'; exit 0 }
@@ -35,24 +37,48 @@ if (-not $cwd) { $cwd = (Get-Location).Path }
 $cfg = Join-Path $cwd '.claude/coordinator.local.md'
 if (-not (Test-Path $cfg)) { '{}'; exit 0 }
 
-$projectId = $null
+# Parse repos list from YAML frontmatter.
+$repos = New-Object System.Collections.Generic.List[string]
+$inFm = $false; $inRepos = $false
 foreach ($line in Get-Content -Path $cfg) {
-  if ($line -match '^project_id:\s*(?:"|'')?([^"''\s]+)(?:"|'')?\s*$') {
-    $projectId = $Matches[1]
-    break
+  if ($line -match '^---\s*$') { $inFm = -not $inFm; continue }
+  if (-not $inFm) { continue }
+  if ($line -match '^repos:\s*$') { $inRepos = $true; continue }
+  if ($inRepos -and $line -match '^\s*-\s*(.+?)\s*$') {
+    $name = $Matches[1].Trim('"').Trim("'")
+    if ($name) { $repos.Add($name) }
+  } elseif ($inRepos -and $line -match '^[^\s]') {
+    $inRepos = $false
   }
 }
-if (-not $projectId) { '{}'; exit 0 }
+if ($repos.Count -eq 0) { '{}'; exit 0 }
 
 $pluginRoot = $env:CLAUDE_PLUGIN_ROOT
 if (-not $pluginRoot) {
   $pluginRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 }
+$scan    = Join-Path $pluginRoot 'scripts/pr-scan.ps1'
+$release = Join-Path $pluginRoot 'scripts/lock-release.ps1'
 
-# Best-effort; swallow errors so the hook never propagates failure.
-try {
-  & pwsh -NoProfile -File (Join-Path $pluginRoot 'scripts/lock-release.ps1') `
-    -Project $projectId -OwnerMatches $agentId *> $null
-} catch { }
+foreach ($repo in $repos) {
+  try {
+    $lines = & pwsh -NoProfile -File $scan -Repos $repo 2>$null
+  } catch {
+    continue
+  }
+  foreach ($line in $lines) {
+    if (-not $line) { continue }
+    try {
+      $rec = $line | ConvertFrom-Json
+    } catch { continue }
+    if (-not $rec.number) { continue }
+    if ($rec.lock_owner -and ($rec.lock_owner -like "*$agentId*")) {
+      try {
+        & pwsh -NoProfile -File $release `
+          -Repo $repo -Pr $rec.number -ExpectedOwner $rec.lock_owner *> $null
+      } catch { }
+    }
+  }
+}
 
 '{}'

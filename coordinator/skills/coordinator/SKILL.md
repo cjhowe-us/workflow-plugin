@@ -1,12 +1,14 @@
 ---
 name: coordinator
 description: >
-  Playbook for the `coordinator` orchestrator agent. Scans a GitHub Project v2
-  (PRs only — no issues), builds the PR `blocked by` dependency graph,
-  computes the unblocked frontier, and dispatches up to 3 background worker
-  teammates. Details the dispatch loop, hook-driven reconciliation, cron-based
-  stale-lock reclaim, and the PR-phase model. Read this at the start of every
-  `/coordinator` pass before acting.
+  Playbook for the `coordinator` orchestrator agent. Scans configured GitHub
+  repositories for draft pull requests carrying a `phase:<name>` label
+  (PRs only — no issues, no Project v2), builds the `blocked_by` dependency
+  graph from each PR's body-marker, computes the unblocked frontier, and
+  dispatches up to 3 background worker teammates. Details the dispatch
+  loop, hook-driven reconciliation, cron-based stale-lock reclaim, and the
+  PR-phase model. Read this at the start of every `/coordinator` pass
+  before acting.
 ---
 
 # coordinator playbook
@@ -16,22 +18,35 @@ from memory.
 
 ## Unit of work: pull requests
 
-PRs are the only unit of work the coordinator tracks. There are no issues, tasks, or cards. Every
-phase of the lifecycle — specify, design, plan, implement, release, docs — is a PR:
+PRs are the only unit of work the coordinator tracks. There are no issues, tasks, cards, or
+projects. Every phase of the lifecycle — specify, design, plan, implement, release, docs — is a PR:
 
-- **Draft PR** = phase is in progress (worker currently holds lock, or paused).
+- **Draft PR** with a `phase:<name>` label = phase is in progress (worker currently holds the lock,
+  or paused).
 - **Ready-for-review PR** (non-draft) = phase is complete. Worker released the lock when it flipped
   the draft state.
 - **Merged / closed PR** = phase artifact has landed.
 
 See `skills/pr-phases/SKILL.md` for the phase model in detail.
 
+## State storage — PR body marker
+
+Per-PR coordination state lives in a single HTML comment line appended to the PR body:
+
+```text
+<!-- coordinator = {"lock_owner":"...","lock_expires_at":"...","blocked_by":[...]} -->
+```
+
+HTML comments are hidden from rendered Markdown but returned raw by the API. The plugin reads,
+splices, and writes back this single line via `gh pr view --json body` and
+`gh pr edit --body-file -`. See `skills/lock-protocol/SKILL.md` for the recipes.
+
 ## Settings resolution
 
-1. Read `.claude/coordinator.local.md` from the current repo. Extract `project_id`, `project_owner`,
-   `project_number`, `default_lease_minutes`.
-2. If missing, ask the user once via `AskUserQuestion` and write the answer back to the local config
-   file. Never prompt twice per session.
+1. Read `.claude/coordinator.local.md` from the current repo. Extract `repos:` (YAML list of
+   `owner/name`) and `default_lease_minutes`.
+2. If missing or empty, ask the user once via `AskUserQuestion` and write the answer back to the
+   local config file. Never prompt twice per session.
 3. Compute `machine_id` once per session: `$(hostname)-$(whoami)-$$`. Compute
    `orchestrator_session_id` as a UUIDv4 (or `date +%s-$$` fallback).
 
@@ -40,30 +55,47 @@ See `skills/pr-phases/SKILL.md` for the phase model in detail.
 Run this sequence on each dispatch trigger (user invocation, TeammateIdle, SubagentStop, TaskStop,
 cron tick). A pass is idempotent.
 
-### 1. Fetch project state
+### 1. Scan the repos
 
-`scripts/project-query.sh $project_id` — returns JSON: one record per project item (PRs only) with
-`{item_id, number, repo, state, is_draft, head_ref_name, phase, lock_owner, lock_expires_at, blocked_by: [item_id...]}`.
+`scripts/pr-scan.sh <repo1> <repo2> ...` — returns one JSON record per managed PR:
+
+```json
+{
+  "repo": "owner/name",
+  "number": 12,
+  "state": "open",
+  "is_draft": true,
+  "head_ref_name": "coordinator/specify-login",
+  "phase": "specify",
+  "lock_owner": "",
+  "lock_expires_at": "",
+  "blocked_by": []
+}
+```
+
+A PR is included iff it is open AND carries a `phase:*` label.
 
 ### 2. Normalize lock state
 
 For each PR: if `lock_expires_at != ""` and `lock_expires_at < now_iso` (ISO-8601 string compare),
-treat as unlocked (`lock_owner` logically empty). Never *clear* the expired lock here — the next
+treat as unlocked (`lock_owner` logically empty). Never *clear* the expired marker here — the next
 worker's acquire will overwrite it.
 
 ### 3. Filter dispatchable PRs
 
 A PR is dispatchable when:
 
-- `state == "open"`.
-- `is_draft == true` (ready-for-review PRs are awaiting human review, not worker attention).
-- `lock_owner` empty (after stale normalization).
-- Every `blocked_by` PR has `state == "merged"`.
+- `state == "open"`
+- `is_draft == true` (ready-for-review PRs are awaiting human review, not worker attention)
+- `lock_owner` empty (after stale normalization)
+- Every PR number in `blocked_by` resolves to a PR in the same repo whose `state == "merged"` (check
+  via `gh pr view <N> --json state --repo ...` when needed; skip PRs where a blocker is `open` or
+  `closed-unmerged`).
 
 ### 4. Topological pick (no FIFO)
 
 Dispatchable PRs form the unblocked frontier of the DAG. When frontier size exceeds free worker
-slots, pick by `number` ascending (stable tiebreak, no queue field needed).
+slots, pick by `number` ascending (stable tiebreak).
 
 ### 5. Dispatch
 
@@ -75,9 +107,8 @@ For each free worker slot (max 3) paired with a frontier PR:
   ```json
   {
     "pr_number": <M>,
-    "phase": "<phase>",
     "repo": "<owner/name>",
-    "project_id": "<PVT_...>",
+    "phase": "<phase>",
     "title": "<PR title>",
     "expected_work_minutes": <default_lease_minutes>
   }
@@ -118,11 +149,12 @@ When a worker sends `{status: "question", text, options}`:
 When the user asks the orchestrator to "start a specify / design / plan / implement / release / docs
 PR for X":
 
-- Use `AskUserQuestion` to confirm the title, repo, and any `blocked-by` PRs.
+- Use `AskUserQuestion` to confirm the title, repo, and any `blocked_by` PR numbers.
 - Drive `scripts/ensure-pr.sh --repo ... --phase ... --title ...` yourself (not from a worker). This
   creates the draft PR and attaches the `phase:<phase>` label.
-- Add the new PR to the Project v2 via `gh project item-add ... --url <pr_url>`.
-- Set `blocked by` relationships via the Project v2 GraphQL API.
+- If `blocked_by` is non-empty, open the PR then immediately call `scripts/lock-acquire.sh` with our
+  owner string to stamp the marker, then `scripts/lock-release.sh` to release — but with
+  `blocked_by` preserved. (Shortcut: set `blocked_by` in the initial marker during the same write.)
 - On the next pass a worker picks it up.
 
 ## Never
@@ -130,16 +162,16 @@ PR for X":
 - Dispatch more than 3 workers concurrently per orchestrator.
 - Dispatch to a PR with `lock_expires_at > now` and non-empty `lock_owner`.
 - Create or update GitHub issues — PRs only.
+- Use GitHub Projects (v2 or otherwise).
 - Clear another orchestrator's lock directly. Only the owning worker or its stop hook releases.
 - Use the Task tool. Teammate dispatch only.
 - Persist state to disk — GitHub is the source of truth.
 
 ## References
 
-- `scripts/project-query.sh` — GraphQL project scan (PRs only).
+- `scripts/pr-scan.sh` — scan repos for managed PRs.
 - `scripts/ensure-pr.sh` — open or resolve a draft PR for a phase.
-- `scripts/lock-acquire.sh` / `lock-release.sh` / `lock-heartbeat.sh` — worker-side lock ops; read
+- `scripts/lock-acquire.sh` / `lock-release.sh` / `lock-heartbeat.sh` — worker-side marker ops; read
   for understanding.
-- `skills/lock-protocol/SKILL.md` — mutation recipes and race mitigation.
-- `skills/pr-phases/SKILL.md` — the PR-phase model (what each phase's artifact is, and when it is
-  "done").
+- `skills/lock-protocol/SKILL.md` — body-marker recipes and race mitigation.
+- `skills/pr-phases/SKILL.md` — the PR-phase model.

@@ -1,7 +1,7 @@
 {
   "metadata": {
     "description": "Official plugin marketplace for the Harmonius game engine.",
-    "version": "1.0.4"
+    "version": "2.0.0"
   },
   "name": "cjhowe-us-workflow",
   "owner": {
@@ -32,27 +32,7 @@
         "name": "Christian Howe"
       },
       "category": "development",
-      "description": "Development workflow with coding standards, document templates, and supervisor agents for the full ideate-design-implement-release lifecycle. Depends on the rumdl plugin.",
-      "name": "harmonize",
-      "source": "./harmonize",
-      "tags": [
-        "coding-standards",
-        "document-templates",
-        "game-engine",
-        "harmonize",
-        "lifecycle",
-        "rust",
-        "tdd",
-        "workflow"
-      ],
-      "version": "2.0.33"
-    },
-    {
-      "author": {
-        "name": "Christian Howe"
-      },
-      "category": "development",
-      "description": "Interactive multi-machine PR dispatch orchestrator. Uses GitHub Project v2 item locks (lock_owner, lock_expires_at) and blocked-by relationships so orchestrators on different machines coordinate without shared filesystem. Dispatches up to 3 worker teammates per orchestrator via agent teams.",
+      "description": "Interactive multi-machine PR dispatch orchestrator. Uses a single HTML-comment marker per PR body to carry lock_owner, lock_expires_at, and blocked_by so orchestrators on different machines coordinate without shared filesystem or GitHub Projects. Dispatches up to 3 background worker teammates per orchestrator via agent teams. Depends on the env-setup plugin for onboarding.",
       "name": "coordinator",
       "source": "./coordinator",
       "tags": [
@@ -61,9 +41,30 @@
         "dispatch",
         "github",
         "orchestrator",
-        "project-v2",
         "pull-request",
         "workflow"
+      ],
+      "version": "0.1.0"
+    },
+    {
+      "author": {
+        "name": "Christian Howe"
+      },
+      "category": "setup",
+      "description": "Cross-platform user-env-var onboarding helper. Detects the user's shell (zsh / bash / fish / sh / ksh / PowerShell) and persists environment variables to the right config — rc file, $PROFILE, or HKCU:\\Environment registry on Windows PowerShell. Used as a dependency by other plugins that need to set env vars during onboarding.",
+      "name": "env-setup",
+      "source": "./env-setup",
+      "tags": [
+        "bash",
+        "cross-platform",
+        "env-var",
+        "fish",
+        "onboarding",
+        "powershell",
+        "registry",
+        "setup",
+        "shell",
+        "zsh"
       ],
       "version": "0.1.0"
     }
