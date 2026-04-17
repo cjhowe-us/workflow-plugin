@@ -26,34 +26,35 @@ themselves. No shared filesystem, no GitHub Projects, no project setup.
 - Claude Code with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` set.
   **Required — the plugin's `SessionStart` hook blocks the session with exit 2 if this is not set.**
   This plugin **depends on `env-setup`** (same marketplace) to persist the variable cross-platform.
-
-  From Claude Code, invoke the env-setup skill:
-
-  ```text
-  /env-setup:env-setup CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1
-  ```
-
-  Or drive the scripts directly:
-
-  ```bash
-  # bash / zsh / fish / sh
-  env-setup/skills/env-setup/scripts/ensure-env.sh \
-    --var CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS --value 1
-  ```
-
-  ```powershell
-  # PowerShell — HKCU:\Environment registry on Windows, $PROFILE elsewhere
-  pwsh -NoProfile -File env-setup/skills/env-setup/scripts/ensure-env.ps1 `
-    -VarName CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS -VarValue 1
-  ```
-
-  `env-setup` detects your shell and writes to the right config for your platform (see
-  `env-setup/README.md` for the supported matrix).
-
 - `gh` CLI authenticated with the `repo` scope (sufficient to read/write PR bodies and labels). No
   `project` / `read:project` scopes needed.
 - One or more GitHub repositories that the authenticated user can edit.
 - The `env-setup` plugin (listed in the same marketplace.json — install together).
+
+### Persisting `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`
+
+From Claude Code, invoke the env-setup skill:
+
+```text
+/env-setup:env-setup CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 1
+```
+
+Or drive the scripts directly:
+
+```bash
+# bash / zsh / fish / sh
+env-setup/skills/env-setup/scripts/ensure-env.sh \
+  --var CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS --value 1
+```
+
+```powershell
+# PowerShell — HKCU:\Environment registry on Windows, $PROFILE elsewhere
+pwsh -NoProfile -File env-setup/skills/env-setup/scripts/ensure-env.ps1 `
+  -VarName CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS -VarValue 1
+```
+
+`env-setup` detects your shell and writes to the right config for your platform (see
+`env-setup/README.md` for the supported matrix).
 
 ## State storage — per-PR body marker
 
