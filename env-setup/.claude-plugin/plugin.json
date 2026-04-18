@@ -3,7 +3,7 @@
     "name": "Christian Howe",
     "url": "https://github.com/cjhowe-us"
   },
-  "description": "Cross-platform user-env-var onboarding helper. Detects the user's shell (zsh / bash / fish / sh / ksh / PowerShell) and persists environment variables to the right config — rc file for POSIX shells, HKCU:\\Environment registry for Windows PowerShell, $PROFILE for PowerShell on macOS/Linux. Used as a dependency by other plugins that need to set env vars during onboarding.",
+  "description": "Cross-platform user-env-var onboarding helper. Detects the user's shell (zsh / bash / fish / sh / ksh / PowerShell) and persists environment variables to the right config \u2014 rc file for POSIX shells, HKCU:\\Environment registry for Windows PowerShell, $PROFILE for PowerShell on macOS/Linux. Used as a dependency by other plugins that need to set env vars during onboarding.",
   "keywords": [
     "bash",
     "cross-platform",
@@ -19,5 +19,5 @@
   "license": "Apache-2.0",
   "name": "env-setup",
   "repository": "https://github.com/cjhowe-us/workflow",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

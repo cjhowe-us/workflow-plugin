@@ -11,6 +11,9 @@
   "enabledPlugins": {
     "artifact@cjhowe-us-marketplace": true,
     "workflow@cjhowe-us-marketplace": true,
+    "artifact-github@cjhowe-us-marketplace": true,
+    "artifact-documents@cjhowe-us-marketplace": true,
+    "env-setup@cjhowe-us-marketplace": true,
     "rumdl@cjhowe-us-marketplace": true
   }
 }

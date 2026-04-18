@@ -1,6 +1,6 @@
 {
   "name": "workflow",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Workflow primitive for the artifact ecosystem. Ships the worker agent, orchestration hooks, the execution artifact provider, the /workflow entry skill, and four meta-workflows (default, author, review, update). Depends on the artifact plugin for providers, templates, and the /artifact entry.",
   "author": {
     "name": "Christian Howe",
@@ -18,4 +18,3 @@
     "agent-teams"
   ]
 }
-
