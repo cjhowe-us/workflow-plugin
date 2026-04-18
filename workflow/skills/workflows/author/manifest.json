@@ -1,0 +1,92 @@
+{
+  "contract_version": 1,
+  "sdlc_phase": [
+    "author"
+  ],
+  "inputs": [
+    {
+      "name": "kind",
+      "type": "string",
+      "required": true,
+      "description": "workflow | artifact-template"
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": false,
+      "description": "Target name (kebab-case). Prompted if absent."
+    },
+    {
+      "name": "scope",
+      "type": "string",
+      "required": false,
+      "default": "user",
+      "description": "override | workspace | user"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "path",
+      "type": "artifact_uri",
+      "description": "file-local:<relative-path> of the created file."
+    }
+  ],
+  "graph": {
+    "steps": [
+      {
+        "id": "draft",
+        "agent": "worker",
+        "prompt_variant": "author",
+        "description": "Collect metadata (name, description, inputs/outputs, graph shape) via AskUserQuestion. Produce a candidate file content."
+      },
+      {
+        "id": "review",
+        "agent": "worker",
+        "prompt_variant": "reviewer",
+        "gate": {
+          "type": "review",
+          "prompt": "Approve the draft or request changes?"
+        },
+        "description": "Show the candidate, run workflow-conformance.sh, let the user request edits."
+      },
+      {
+        "id": "write",
+        "agent": "worker",
+        "prompt_variant": "author",
+        "description": "Resolve target path via the authoring skill. Write via file-local provider. Re-run conformance on the committed file."
+      }
+    ],
+    "transitions": [
+      {
+        "id": "t1",
+        "from": "draft",
+        "to": "review"
+      },
+      {
+        "id": "t2",
+        "from": "review",
+        "to": "write"
+      },
+      {
+        "id": "t3",
+        "from": "review",
+        "to": "draft",
+        "metadata": {
+          "reasoning": "Reviewer requested changes",
+          "conditional": "llm-judge"
+        }
+      }
+    ]
+  },
+  "dynamic_branches": [
+    {
+      "step": "review",
+      "judge": "llm-judge",
+      "transitions": [
+        "t2",
+        "t3"
+      ]
+    }
+  ],
+  "name": "author"
+}

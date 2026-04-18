@@ -1,31 +1,7 @@
 ---
 name: default
-description: Default orchestrator + tutor. Entry point for `/workflow` — interprets the user's free-form request, loads only the files needed, dispatches workers, polls providers, renders the dashboard. On first invocation (when `tutor.completed` is not set in preferences), walks the user through the two primitives (workflow, artifact), installed extensions, and a guided try-it. Subsequent invocations go straight to dashboard + intent routing.
-contract_version: 1
-sdlc_phase: []
-inputs:
-  - name: request
-    type: string
-    required: false
-    description: "Free-form user request. Empty = open dashboard."
-outputs:
-  - name: response
-    type: string
-    description: "Rendered dashboard or action result."
-graph:
-  steps:
-    - id: interpret
-      agent: worker
-      prompt_variant: orchestrator
-      description: "Interpret intent against the shallow registry; decide what to load."
-    - id: act
-      agent: worker
-      prompt_variant: orchestrator
-      description: "Load what's needed; dispatch or render."
-  transitions:
-    - id: t1
-      from: interpret
-      to: act
+description: |-
+  Default orchestrator + tutor. Entry point for `/workflow` — interprets the user's free-form request, loads only the files needed, dispatches workers, polls providers, renders the dashboard. On first invocation (when `tutor.completed` is not set in preferences), walks the user through the two primitives (workflow, artifact), installed extensions, and a guided try-it. Subsequent invocations go straight to dashboard + intent routing.
 ---
 
 # default

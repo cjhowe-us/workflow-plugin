@@ -1,34 +1,7 @@
 ---
 name: review
-description: Meta-workflow — critique an existing workflow or artifact template without modifying it. Loads the target via the authoring skill, runs conformance + heuristic checks (naming, step-id uniqueness, input/output coverage, dynamic-branch reachability, dead transitions), and emits a report. Never writes. Use when the user says "review the X workflow", "audit my template".
-contract_version: 1
-sdlc_phase: [review]
-inputs:
-  - name: uri
-    type: artifact_uri
-    required: true
-    description: "file-local:<relative-path> of the workflow or template to review."
-outputs:
-  - name: findings
-    type: string
-    description: "Markdown report of findings + suggestions."
-graph:
-  steps:
-    - id: load
-      agent: worker
-      prompt_variant: reviewer
-      description: "Resolve URI, read file content."
-    - id: critique
-      agent: worker
-      prompt_variant: reviewer
-      description: "Run workflow-conformance.sh; apply heuristic checks; generate findings."
-    - id: report
-      agent: worker
-      prompt_variant: reviewer
-      description: "Format findings as markdown; present to the user."
-  transitions:
-    - { id: t1, from: load,     to: critique }
-    - { id: t2, from: critique, to: report }
+description: |-
+  Meta-workflow — critique an existing workflow or artifact template without modifying it. Loads the target via the authoring skill, runs conformance + heuristic checks (naming, step-id uniqueness, input/output coverage, dynamic-branch reachability, dead transitions), and emits a report. Never writes. Use when the user says "review the X workflow", "audit my template".
 ---
 
 # review

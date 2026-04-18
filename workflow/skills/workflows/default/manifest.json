@@ -1,0 +1,43 @@
+{
+  "contract_version": 1,
+  "sdlc_phase": [],
+  "inputs": [
+    {
+      "name": "request",
+      "type": "string",
+      "required": false,
+      "description": "Free-form user request. Empty = open dashboard."
+    }
+  ],
+  "outputs": [
+    {
+      "name": "response",
+      "type": "string",
+      "description": "Rendered dashboard or action result."
+    }
+  ],
+  "graph": {
+    "steps": [
+      {
+        "id": "interpret",
+        "agent": "worker",
+        "prompt_variant": "orchestrator",
+        "description": "Interpret intent against the shallow registry; decide what to load."
+      },
+      {
+        "id": "act",
+        "agent": "worker",
+        "prompt_variant": "orchestrator",
+        "description": "Load what's needed; dispatch or render."
+      }
+    ],
+    "transitions": [
+      {
+        "id": "t1",
+        "from": "interpret",
+        "to": "act"
+      }
+    ]
+  },
+  "name": "default"
+}
