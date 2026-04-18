@@ -108,15 +108,46 @@ extra flags `orphaned`.
 
 ## Scopes
 
-Workflows resolve by scope precedence (highest first):
+Workflows (and artifact templates + providers + backends) resolve by scope precedence
+(highest first):
 
-1. override — `$CWD/.workflow-override/workflows/<name>/SKILL.md`
-2. workspace — `$REPO/.claude/workflows/<name>/SKILL.md`
-3. user — `~/.claude/workflows/<name>/SKILL.md`
-4. plugin    — `<installed-plugin>/skills/workflows/<name>/SKILL.md`
+| Scope       | Path                                                            |
+|-------------|-----------------------------------------------------------------|
+| `override`  | `$CWD/.artifact-override/workflows/<name>/`                     |
+| `workspace` | `$REPO/.claude/workflows/<name>/`                               |
+| `user`      | `~/.claude/workflows/<name>/`                                   |
+| `plugin`    | `<installed-plugin>/skills/workflows/<name>/`                   |
 
-The `conductor` workflow writes only to override/workspace/user scope — never plugin scope (the
-`pretooluse-no-self-edit.sh` hook enforces this).
+Each directory holds `SKILL.md` + `manifest.json`. A workspace-scope workflow named `default`
+shadows the plugin's `default`; an override-scope workflow shadows everything. This is the
+extension mechanism — you don't fork the plugin, you drop files.
+
+### Which scope should I pick?
+
+| Audience                     | Scope        |
+|------------------------------|--------------|
+| My whole team / project      | `workspace`  |
+| Just me, across all projects | `user`       |
+| One-off / temporary hack in this working tree | `override` |
+| Ship to everyone via the marketplace | `plugin` (open a PR to the plugin repo) |
+
+### Override example
+
+Drop a workflow named `default` under `$CWD/.artifact-override/workflows/default/` to
+temporarily replace the orchestrator with a custom dispatch for the session — no plugin
+changes, no commit needed. Delete the dir to revert.
+
+### Artifact templates mirror the same rules
+
+`artifact-templates/<name>.md` under each scope dir — discovery picks them up. Same shadowing
+semantics. Example: a workspace-scope `design-document.md` overrides the plugin's shipped
+template for this project only.
+
+### Writes through the conductor
+
+The `conductor` workflow (`/workflow create …`, `/workflow update …`, etc.) writes only to
+override / workspace / user — never plugin scope (the `pretooluse-no-self-edit.sh` hook
+enforces this).
 
 ## Validation
 

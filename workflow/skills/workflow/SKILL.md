@@ -43,6 +43,21 @@ worktree.
 The artifact plugin's `run-provider.sh` is the uniform dispatch surface for every provider call a worker makes during
 execution.
 
+## Author your own
+
+Custom workflows drop into one of four scope directories (override > workspace > user >
+plugin). The plugin-shipped ones are immutable; all authoring goes through `conductor`:
+
+| Goal                             | Command                                            |
+|----------------------------------|----------------------------------------------------|
+| Project-wide (committed to repo) | `/workflow create <name> --scope workspace`        |
+| Personal (across all projects)   | `/workflow create <name> --scope user`             |
+| One-off (this working tree)      | `/workflow create <name> --scope override`         |
+
+Same pattern for `update`, `review`, `delete`. All four dispatch the `conductor` workflow
+with the matching `mode` input. See `references/workflow-contract.md` §Scopes for path
+details and the decision table.
+
 ## First run (tutor)
 
 On the first invocation after install, `preferences:user.tutor.completed` is falsy. Route to the tutor flow: welcome,
