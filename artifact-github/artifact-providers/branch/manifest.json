@@ -1,0 +1,5 @@
+{
+  "name": "branch",
+  "description": "GitHub Branch artifact scheme. Backed by gh-branch (GitHub) by default; any backend declaring backs_schemes: [branch] can serve it.",
+  "contract_version": 1
+}

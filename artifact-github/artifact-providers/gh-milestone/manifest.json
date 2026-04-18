@@ -1,5 +1,0 @@
-{
-  "name": "gh-milestone",
-  "description": "GitHub Milestone artifact provider. URIs `gh-milestone:<owner>/<repo>/<number>`. Status open\u2192running, closed\u2192complete. No assignee-lock; milestones are collection artifacts (issues/PRs aggregate under them). contract_version 1.",
-  "contract_version": 1
-}

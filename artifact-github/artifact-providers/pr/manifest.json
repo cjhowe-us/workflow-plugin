@@ -1,0 +1,5 @@
+{
+  "name": "pr",
+  "description": "GitHub Pull Request artifact scheme. Backed by gh-pr (GitHub) by default; any backend declaring backs_schemes: [pr] can serve it.",
+  "contract_version": 1
+}

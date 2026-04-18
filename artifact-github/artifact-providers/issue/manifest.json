@@ -1,0 +1,5 @@
+{
+  "name": "issue",
+  "description": "GitHub Issue artifact scheme. Backed by gh-issue (GitHub) by default; any backend declaring backs_schemes: [issue] can serve it.",
+  "contract_version": 1
+}

@@ -1,0 +1,11 @@
+{
+  "name": "gh-gist",
+  "description": "GitHub Gist artifact provider. URIs `gh-gist:<gist-id>` (gists are globally scoped, not repo-scoped). Public or secret. Lock = gist owner; cross-user writes require a transfer. Used as the storage for the per-user presence gist (`workflow-user-lock-<user>`) and as an opt-in spillover for large execution state. contract_version 1.",
+  "contract_version": 1,
+  "backs_schemes": [
+    "gist"
+  ],
+  "supports_locking": true,
+  "supports_edges": false,
+  "min_poll_interval_s": 30
+}

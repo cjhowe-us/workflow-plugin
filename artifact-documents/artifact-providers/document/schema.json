@@ -1,0 +1,19 @@
+{
+  "scheme": "document",
+  "contract_version": 1,
+  "fields": {
+    "path":        { "type": "string",   "description": "Backend-relative identifier (filesystem path or page key)." },
+    "title":       { "type": "string" },
+    "body":        { "type": "markdown" },
+    "frontmatter": { "type": "json" }
+  },
+  "subcommands": {
+    "create": { "required": true,  "in": ["path", "title", "body", "frontmatter"], "out": ["uri", "created"] },
+    "get":    { "required": true,  "in": ["uri"],                                     "out": ["uri", "title", "body", "frontmatter", "edges"] },
+    "update": { "required": true,  "in": ["uri", "patch"],                            "out": ["uri", "updated"] },
+    "list":   { "required": true,  "in": ["filter"],                                  "out": ["entries"] },
+    "delete": { "required": false, "in": ["uri"],                                     "out": ["deleted"] },
+    "status": { "required": true,  "in": ["uri"],                                     "out": ["uri", "status"] },
+    "edges":  { "required": false, "relations": ["depends_on", "references", "composed_of", "mentions", "cites"] }
+  }
+}

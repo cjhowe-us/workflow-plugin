@@ -1,0 +1,9 @@
+{
+  "name": "execution-gh-pr",
+  "description": "GitHub-PR backend for the execution scheme. An execution maps 1:1 with a PR: wf:summary + wf:ledger sections in the body; wf:progress comments for the event log; PR assignee as the lock. Backs: execution.",
+  "contract_version": 1,
+  "backs_schemes": ["execution"],
+  "supports_locking": true,
+  "supports_edges": false,
+  "min_poll_interval_s": 30
+}

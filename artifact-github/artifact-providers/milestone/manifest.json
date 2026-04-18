@@ -1,0 +1,5 @@
+{
+  "name": "milestone",
+  "description": "GitHub Milestone artifact scheme. Backed by gh-milestone (GitHub) by default; any backend declaring backs_schemes: [milestone] can serve it.",
+  "contract_version": 1
+}

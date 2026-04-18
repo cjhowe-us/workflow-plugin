@@ -1,0 +1,11 @@
+{
+  "name": "gh-issue",
+  "description": "GitHub Issue artifact provider. URIs `gh-issue:<owner>/<repo>/<number>`. Lock = assignee. Status open\u2192running, closed\u2192complete (closed-not-planned\u2192aborted). Progress via issue comments tagged `<!-- wf:progress -->`. contract_version 1.",
+  "contract_version": 1,
+  "min_poll_interval_s": 30,
+  "backs_schemes": [
+    "issue"
+  ],
+  "supports_locking": true,
+  "supports_edges": false
+}

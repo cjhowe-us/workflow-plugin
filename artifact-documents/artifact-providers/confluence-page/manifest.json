@@ -1,6 +1,0 @@
-{
-  "name": "confluence-page",
-  "description": "Confluence Cloud page artifact provider. URIs `confluence-page:<space>/<id>`. Requires CONFLUENCE_BASE_URL + CONFLUENCE_TOKEN (personal access token). Lock = page owner (assignee-equivalent). Status open/current/archived. Progress events as page-version edits with `<!-- wf:progress -->` markers. contract_version 1.",
-  "contract_version": 1,
-  "min_poll_interval_s": 60
-}

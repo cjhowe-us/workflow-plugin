@@ -1,9 +1,10 @@
-# document provider
+# document — artifact scheme
 
-A thin, backend-agnostic document wrapper. URI syntax is `document:<backend>/<id>` — the provider
-looks at `<backend>` and delegates `artifact.sh` calls to that backend's provider (defaulting to
-`file-local`).
+Markdown document with YAML frontmatter + body.
 
-This indirection lets workflows express intent as "this step produces a design-document artifact"
-without hard-coding the storage — a workspace preference can flip a whole repo's documents from
-local to Confluence by changing the default backend.
+URIs: `document|<backend>/<path>`.
+
+Default backends:
+
+- `document-filesystem` — writes to disk under the current git worktree.
+- `document-confluence` — writes to a Confluence page.

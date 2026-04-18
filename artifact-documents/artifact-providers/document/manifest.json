@@ -1,5 +1,5 @@
 {
   "name": "document",
-  "description": "Generic document artifact provider. URIs `document:<backend>/<id>` where backend defaults to `file-local`. Thin wrapper that delegates to a backing store \u2014 `file-local` by default; a future `confluence-page` backend lives alongside. Use for any markdown / text document a workflow owns (design docs, plans, reviews, release notes). contract_version 1.",
+  "description": "Markdown document artifact scheme. A structured doc with YAML frontmatter + body. Backed by document-filesystem (local disk; default) or document-confluence (Confluence page).",
   "contract_version": 1
 }

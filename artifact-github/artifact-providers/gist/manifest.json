@@ -1,0 +1,5 @@
+{
+  "name": "gist",
+  "description": "GitHub Gist artifact scheme. Backed by gh-gist (GitHub) by default; any backend declaring backs_schemes: [gist] can serve it.",
+  "contract_version": 1
+}

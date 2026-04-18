@@ -1,5 +1,0 @@
-{
-  "name": "gh-branch",
-  "description": "Git branch artifact provider via GitHub API. URIs `gh-branch:<owner>/<repo>/<branch>`. No assignee-lock; branches are ownerless refs. Status = `running` once created, `complete` once merged into a tracked base. contract_version 1.",
-  "contract_version": 1
-}

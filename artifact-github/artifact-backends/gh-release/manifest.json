@@ -1,0 +1,11 @@
+{
+  "name": "gh-release",
+  "description": "GitHub Release artifact provider. URIs `gh-release:<owner>/<repo>/<tag>`. No locking (releases are one-shot). Status = draft|published|deleted. Progress log via release body notes sections. contract_version 1.",
+  "contract_version": 1,
+  "backs_schemes": [
+    "release"
+  ],
+  "supports_locking": true,
+  "supports_edges": false,
+  "min_poll_interval_s": 30
+}

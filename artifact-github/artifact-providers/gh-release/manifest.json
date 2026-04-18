@@ -1,5 +1,0 @@
-{
-  "name": "gh-release",
-  "description": "GitHub Release artifact provider. URIs `gh-release:<owner>/<repo>/<tag>`. No locking (releases are one-shot). Status = draft|published|deleted. Progress log via release body notes sections. contract_version 1.",
-  "contract_version": 1
-}

@@ -1,0 +1,11 @@
+{
+  "name": "gh-pr",
+  "description": "GitHub Pull Request artifact provider. URIs are `gh-pr:<owner>/<repo>/<number>`. Lock = PR assignee. Status maps open\u2192running, merged\u2192complete, closed-without-merge\u2192aborted. Progress log appended as PR comments tagged `<!-- wf:progress -->`. contract_version 1.",
+  "contract_version": 1,
+  "min_poll_interval_s": 30,
+  "backs_schemes": [
+    "pr"
+  ],
+  "supports_locking": true,
+  "supports_edges": false
+}

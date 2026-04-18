@@ -1,0 +1,5 @@
+{
+  "name": "tag",
+  "description": "GitHub Tag artifact scheme. Backed by gh-tag (GitHub) by default; any backend declaring backs_schemes: [tag] can serve it.",
+  "contract_version": 1
+}

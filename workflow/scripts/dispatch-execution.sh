@@ -58,5 +58,5 @@ payload=$(jq -n --arg w "$wf_name" --argjson i "$inputs" --arg o "$owner" --arg 
   }
 ')
 
-response=$(printf '%s' "$payload" | "$runner" execution "" create --data -)
+response=$(printf '%s' "$payload" | "$runner" execution create --data -)
 printf '%s\n' "$response"

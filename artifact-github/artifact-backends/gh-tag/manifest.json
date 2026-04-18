@@ -1,0 +1,11 @@
+{
+  "name": "gh-tag",
+  "description": "Git tag artifact provider via GitHub API. URIs `gh-tag:<owner>/<repo>/<tag-name>`. No assignee-lock; tags are one-shot. Status = published once created. contract_version 1.",
+  "contract_version": 1,
+  "backs_schemes": [
+    "tag"
+  ],
+  "supports_locking": true,
+  "supports_edges": false,
+  "min_poll_interval_s": 30
+}

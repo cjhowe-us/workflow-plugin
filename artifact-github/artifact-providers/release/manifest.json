@@ -1,0 +1,5 @@
+{
+  "name": "release",
+  "description": "GitHub Release artifact scheme. Backed by gh-release (GitHub) by default; any backend declaring backs_schemes: [release] can serve it.",
+  "contract_version": 1
+}

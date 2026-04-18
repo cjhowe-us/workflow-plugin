@@ -1,0 +1,111 @@
+{
+  "scheme": "milestone",
+  "contract_version": 1,
+  "fields": {
+    "title": {
+      "type": "string"
+    },
+    "body": {
+      "type": "markdown"
+    },
+    "state": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string"
+    }
+  },
+  "subcommands": {
+    "create": {
+      "required": true,
+      "in": [],
+      "out": [
+        "uri",
+        "url",
+        "created"
+      ]
+    },
+    "get": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "title",
+        "body",
+        "state",
+        "url",
+        "edges"
+      ]
+    },
+    "update": {
+      "required": true,
+      "in": [
+        "uri",
+        "patch"
+      ],
+      "out": [
+        "uri",
+        "updated"
+      ]
+    },
+    "list": {
+      "required": true,
+      "in": [
+        "filter"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "lock": {
+      "required": false,
+      "in": [
+        "uri",
+        "owner"
+      ],
+      "out": [
+        "held",
+        "current_owner"
+      ]
+    },
+    "release": {
+      "required": false,
+      "in": [
+        "uri",
+        "owner"
+      ],
+      "out": [
+        "released"
+      ]
+    },
+    "status": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "status"
+      ]
+    },
+    "progress": {
+      "required": false,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "edges": {
+      "required": false,
+      "relations": [
+        "closes",
+        "depends_on",
+        "bundled_in"
+      ]
+    }
+  }
+}
