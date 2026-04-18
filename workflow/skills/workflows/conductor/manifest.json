@@ -1,0 +1,126 @@
+{
+  "name": "conductor",
+  "contract_version": 1,
+  "sdlc_phase": ["author"],
+  "inputs": [
+    {
+      "name": "mode",
+      "type": "enum",
+      "values": ["create", "update", "review", "delete"],
+      "required": false,
+      "default": "create",
+      "description": "Which CRUD operation to perform on an artifact. create scaffolds; update edits in place; review audits (read-only); delete removes."
+    },
+    {
+      "name": "scheme",
+      "type": "string",
+      "required": false,
+      "description": "workflow | artifact-template | ... Required when mode=create."
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": false,
+      "description": "Target name (kebab-case). Prompted if absent when mode=create."
+    },
+    {
+      "name": "scope",
+      "type": "string",
+      "required": false,
+      "default": "user",
+      "description": "override | workspace | user. Required when mode=create."
+    },
+    {
+      "name": "uri",
+      "type": "artifact_uri",
+      "required": false,
+      "description": "Existing artifact URI. Required when mode is update, review, or delete."
+    },
+    {
+      "name": "instructions",
+      "type": "string",
+      "required": false,
+      "description": "Free-form description. Required when mode=update; optional for review (focus hints); ignored for create/delete."
+    }
+  ],
+  "outputs": [
+    {
+      "name": "uri",
+      "type": "artifact_uri",
+      "description": "URI of the artifact acted on (created, updated, reviewed, or deleted)."
+    },
+    {
+      "name": "report",
+      "type": "artifact_uri",
+      "description": "Review-note artifact URI when mode=review; absent otherwise."
+    }
+  ],
+  "graph": {
+    "steps": [
+      {
+        "id": "load",
+        "when": "mode != 'create'",
+        "agent": "worker",
+        "prompt_variant": "reviewer",
+        "description": "Read the target artifact (artifact.get) for update / review / delete modes. Refuse plugin-scope paths."
+      },
+      {
+        "id": "draft",
+        "when": "mode == 'create' || mode == 'update'",
+        "agent": "worker",
+        "prompt_variant": "author",
+        "description": "Create: prompt for metadata and produce candidate content. Update: apply instructions to the loaded content. Runs the workflow-contract validator on any workflow/artifact-template output."
+      },
+      {
+        "id": "critique",
+        "when": "mode == 'review'",
+        "agent": "worker",
+        "prompt_variant": "reviewer",
+        "description": "Run workflow-conformance.sh + heuristics (naming, reachability, dead transitions, missing descriptions). Produce a structured review note."
+      },
+      {
+        "id": "confirm",
+        "agent": "worker",
+        "gate": {
+          "type": "review",
+          "prompt": "Approve (create/update: the draft; delete: the removal; review: write the report)?"
+        },
+        "description": "Fire the user gate appropriate to the mode. For review: approve writing the review-note artifact. For delete: confirm destruction. For create/update: approve the draft/diff."
+      },
+      {
+        "id": "commit",
+        "agent": "worker",
+        "prompt_variant": "author",
+        "description": "Create: resolve path (authoring.resolve_path) and artifact.create. Update: artifact.update on the existing URI. Review: artifact.create a review-note document referencing the target. Delete: artifact.delete."
+      }
+    ],
+    "transitions": [
+      {"id": "t0", "from": "load",     "to": "draft"},
+      {"id": "t1", "from": "load",     "to": "critique"},
+      {"id": "t2", "from": "draft",    "to": "confirm"},
+      {"id": "t3", "from": "critique", "to": "confirm"},
+      {"id": "t4", "from": "confirm",  "to": "commit"},
+      {
+        "id": "t5",
+        "from": "confirm",
+        "to": "draft",
+        "metadata": {
+          "reasoning": "Reviewer requested changes (create/update modes)",
+          "conditional": "llm-judge"
+        }
+      }
+    ]
+  },
+  "dynamic_branches": [
+    {
+      "step": "load",
+      "judge": "rule",
+      "transitions": ["t0", "t1"]
+    },
+    {
+      "step": "confirm",
+      "judge": "llm-judge",
+      "transitions": ["t4", "t5"]
+    }
+  ]
+}

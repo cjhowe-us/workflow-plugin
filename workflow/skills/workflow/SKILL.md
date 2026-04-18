@@ -28,6 +28,10 @@ Map the user's input to one of these patterns before loading details. For anythi
 | "release <change>"                            | Clear assignee lock (manual transfer)                  | `references/multi-dev.md` |
 | "tunnel <worker>" / "untunnel"                | Open / close direct user↔worker channel                | `references/tunneling.md` |
 | "limit <N>" / "raise my wip cap"              | Adjust wip caps in `preferences:user`                  | `references/running.md` |
+| "create <workflow>" / "new template"          | Dispatch `conductor` (mode=create)                     | `references/running.md` |
+| "update <uri>" / "edit my workflow"           | Dispatch `conductor` (mode=update)                     | `references/running.md` |
+| "review <uri>"                                | Dispatch `conductor` (mode=review)                     | `references/running.md` |
+| "delete <uri>"                                | Dispatch `conductor` (mode=delete)                     | `references/running.md` |
 
 ## Dispatch primer
 
@@ -53,8 +57,9 @@ Re-open later with "teach me again" or equivalent.
 - Identity from `gh auth status`; no login dialog.
 - One orchestrator per machine (flock).
 - Progress rendered on demand from provider queries; no caches.
-- Plugin files are immutable; writes go through override / workspace / user scope via the `author` / `update` / `review`
-  meta-workflows (which use `/artifact create` under the hood).
+- Plugin files are immutable; writes go through override / workspace / user scope via the
+  `conductor` workflow (create / update / review / delete modes, all on top of the artifact
+  plugin's CRUD surface).
 
 ## References (load on demand)
 

@@ -30,6 +30,7 @@ graph:
       template: <template-name> # optional: artifact template to produce an artifact
       inputs: { ... }           # optional: inputs passed to the sub-workflow or step body
       gate: { type: review|approve|choose|input, prompt: "..." }  # optional
+      when: "<expression>"      # optional: skip the step when the expression is falsy
       pre: { ... }              # optional: preconditions (lint, stash gate, etc.)
   transitions:
     - id: <transition-id>
@@ -52,7 +53,7 @@ rules:
 # <workflow-name>
 
 Free-form human description. Not loaded by the engine at dispatch; consumed only by the
-author/review meta-workflows and the dashboard's detail view.
+`conductor` (author) + `review` workflows and the dashboard's detail view.
 ```
 
 ## Invariants the engine enforces
@@ -65,6 +66,32 @@ author/review meta-workflows and the dashboard's detail view.
 5. `inputs[].type` is validated on `/workflow start` — a missing required input fails dispatch fast.
 6. Composition (`step.workflow: <name>`) is resolved at dispatch time via the registry; a missing
    sub-workflow causes a hard validation error before any teammate is spawned.
+7. `step.when: "<expr>"` evaluates the expression against the workflow's inputs. Truthy → step
+   runs; falsy → step is skipped and its outbound transitions fire from the preceding step's `to`
+   as if the step were inlined. Allowed expressions: equality (`x == 'v'`), inequality, boolean
+   and/or/not, literal `true`/`false`. No side effects; expressions are pure over the inputs bag.
+
+## Conditional steps
+
+Any step may declare `when: "<expression>"`. The expression is evaluated once at dispatch time
+against the workflow's declared inputs; there is no re-evaluation after the step would have run.
+
+```yaml
+graph:
+  steps:
+    - id: load
+      when: "mode == 'update'"
+      ...
+    - id: draft
+      ...
+  transitions:
+    - { id: t0, from: load,  to: draft }   # skipped when load is skipped
+    - { id: t1, from: draft, to: review }
+```
+
+When `load` is skipped, the engine treats `t0`'s outbound target (`draft`) as the start step for
+the run. Skipped steps record a `skipped_at` timestamp + the falsy expression in the ledger so
+retroactive-diff can reason about them.
 
 ## Step signature (used for retroactive-diff)
 
@@ -88,7 +115,7 @@ Workflows resolve by scope precedence (highest first):
 3. user — `~/.claude/workflows/<name>/SKILL.md`
 4. plugin    — `<installed-plugin>/skills/workflows/<name>/SKILL.md`
 
-The `author` meta-workflow writes only to override/workspace/user scope — never plugin scope (the
+The `conductor` workflow writes only to override/workspace/user scope — never plugin scope (the
 `pretooluse-no-self-edit.sh` hook enforces this).
 
 ## Validation

@@ -2,7 +2,7 @@
 
 Workflow primitive for the artifact ecosystem. Ships the worker agent, orchestration hooks, the execution artifact
 provider, the `/workflow` entry skill, three workflow-shape artifact templates (write-review, plan-do,
-workflow-execution), and four meta-workflows (default, author, review, update).
+workflow-execution), the `conductor` meta-workflow (the workflow that creates new workflows), and three support workflows (default, review, update).
 
 Depends on the [`artifact`](../artifact) plugin for the artifact / template / provider primitives.
 
@@ -36,7 +36,7 @@ welcome, the workflow/artifact primitives, installed extensions, and a guided tr
 - `scripts/orchestrator-lock.sh` — per-machine flock. `scripts/dispatch-execution.sh` — shared helper used by
   workflow-shape templates to instantiate an execution artifact.
 - `skills/workflow/` — `/workflow` entry skill. References under `references/` load on demand.
-- `skills/workflows/` — `default`, `author`, `review`, `update` meta-workflows.
+- `skills/workflows/` — `default` (dashboard + dispatch), `conductor` (meta-workflow: authors new workflows), `review` (audits), `update` (edits).
 - `artifact-templates/` — `write-review`, `plan-do`, `workflow-execution`. Directory-per- template (manifest.json +
   TEMPLATE.md + instantiate.sh).
 - `artifact-providers/execution/` — the workflow-domain execution provider. Default backend is a GitHub PR (body +

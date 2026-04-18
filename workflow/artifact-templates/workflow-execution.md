@@ -10,29 +10,6 @@ inputs:
   - { name: 'target_repo', type: 'string', required: false, description: '<owner>/<repo>. Required when the execution provider needs it (gh-pr default does).' }
   - { name: 'owner', type: 'string', required: false, description: 'GH user taking ownership. Defaults to `gh auth` user.' }
 ---
-
----
-name: workflow-execution
-description: The one artifact template that turns a workflow definition into a live workflow-execution artifact. Single step — instantiate — calls `execution.create` via the configured provider (default gh-pr) with the workflow's inputs and the owning GitHub user. Invoked by `/workflow start <workflow>` and by every step in every other workflow that composes a sub-workflow.
-contract_version: 1
-sdlc_phase: [dispatch]
-inputs:
-  - { name: workflow,    type: workflow_ref, required: true,  description: "URI or name of the workflow definition to run." }
-  - { name: workflow_inputs, type: json,     required: false, description: "Map of inputs to pass to the workflow. Validated against the workflow's declared inputs." }
-  - { name: parent_execution, type: artifact_uri, required: false, description: "Parent execution URI when this is a sub-workflow dispatch." }
-  - { name: target_repo, type: string,       required: false, description: "<owner>/<repo>. Required when the execution provider needs it (gh-pr default does)." }
-  - { name: owner,       type: string,       required: false, description: "GH user taking ownership. Defaults to `gh auth` user." }
-outputs:
-  - { name: execution,   type: artifact_uri, description: "Newly-created workflow-execution artifact." }
-graph:
-  steps:
-    - id: instantiate
-      agent: worker
-      prompt_variant: dispatcher
-      description: "Resolve workflow; validate workflow_inputs against the workflow's inputs contract; call `execution.create` via the configured provider with the rendered payload; return the URI."
-  transitions: []
----
-
 # workflow-execution
 
 Canonical entry to run a workflow. Every start path — user-invoked or orchestrator-internal — goes

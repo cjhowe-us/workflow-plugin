@@ -33,8 +33,11 @@ Against the registry, decide what the user wants:
 - Inspect / resume — "show me the sdlc run on X", "resume exec-A" → load the specific execution's
   provider, render details, offer next actions.
 - Tunnel — `tunnel <worker-id>` → open a tunnel via `tunneling` skill.
-- Author — "create a new workflow called X" → delegate to `author` meta-workflow.
-- Review / update — "review the bug-fix workflow" → delegate to `review` or `update` meta-workflow.
+- Author / update / review / delete — "create a new workflow called X", "update the bug-fix
+  workflow", "review the cut-release workflow", "delete my-template" → delegate to the
+  `conductor` workflow with the matching `mode` input. `conductor` is the only meta-workflow:
+  a workflow that operates on other workflows + artifact templates. No separate review/update
+  flows.
 
 When intent is ambiguous, emit a single-line clarification question (`AskUserQuestion`) rather than
 guessing.
@@ -51,12 +54,12 @@ Load on demand:
 
 - Target workflow SKILL.md (only when the user chose one).
 - Target artifact-template SKILL.md (only when generating an artifact).
-- Specific provider SKILL.md (only when reading/writing its kind).
+- Specific provider SKILL.md (only when reading/writing its scheme).
 
 ## Invariants
 
 - The orchestrator never writes artifacts directly — it delegates to workers via teammate dispatch,
-  or to the meta-workflows for authoring.
+  or to `conductor` for authoring.
 - The orchestrator never caches provider state across turns — every dashboard render is a fresh
   query.
 - The orchestrator is plugin-immutable. Any change lands via an external PR or an override-scope
