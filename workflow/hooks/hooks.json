@@ -1,32 +1,32 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-env-check.sh" }] },
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-orchestrator-lock.sh" }] }
+      { "hooks": [{ "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-env-check.py" }] },
+      { "hooks": [{ "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-orchestrator-lock.py" }] }
     ],
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/userpromptsubmit-status.sh" }] }
+      { "hooks": [{ "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/userpromptsubmit-status.py" }] }
     ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write|Bash",
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-no-self-edit.sh" },
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-rules.sh" }
+          { "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-no-self-edit.py" },
+          { "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-rules.py" }
         ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|Bash",
-        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-progress.sh" }]
+        "hooks": [{ "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/posttooluse-progress.py" }]
       }
     ],
     "SubagentStop": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/subagentstop-release.sh" }] }
+      { "hooks": [{ "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/subagentstop-release.py" }] }
     ],
     "TeammateIdle": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/teammateidle-rescan.sh" }] }
+      { "hooks": [{ "type": "command", "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/teammateidle-rescan.py" }] }
     ]
   }
 }

@@ -1,0 +1,9 @@
+name             = "execution-gh-pr"
+description      = "Stores `execution` artifacts as GitHub Pull Requests; progress is journaled as PR comments."
+contract_version = 1
+backs_schemes    = ["execution"]
+
+[capabilities]
+supports_locking = true
+supports_listing = true
+supports_watching = false

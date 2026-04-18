@@ -1,6 +1,0 @@
-{
-  "name": "execution",
-  "description": "Workflow-execution artifact provider. Backs execution artifacts \u2014 the live record of a running or completed workflow. Default backend is the workflow's GitHub PR (description + comments); maps PR status to execution lifecycle (open=running, merged=complete, closed=aborted). Progress log lands in PR comments tagged with a machine-readable marker. contract_version 1.",
-  "contract_version": 1,
-  "min_poll_interval_s": 30
-}

@@ -116,9 +116,9 @@ Workflows (and artifact templates + providers + backends) resolve by scope prece
 | `override`  | `$CWD/.artifact-override/workflows/<name>/`                     |
 | `workspace` | `$REPO/.claude/workflows/<name>/`                               |
 | `user`      | `~/.claude/workflows/<name>/`                                   |
-| `plugin`    | `<installed-plugin>/skills/workflows/<name>/`                   |
+| `plugin`    | `<installed-plugin>/workflows/<name>/`                          |
 
-Each directory holds `SKILL.md` + `manifest.json`. A workspace-scope workflow named `default`
+Each directory holds `workflow.md` + `manifest.json`. A workspace-scope workflow named `default`
 shadows the plugin's `default`; an override-scope workflow shadows everything. This is the
 extension mechanism — you don't fork the plugin, you drop files.
 

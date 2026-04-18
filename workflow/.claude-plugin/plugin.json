@@ -1,14 +1,14 @@
 {
   "name": "workflow",
-  "version": "1.1.0",
-  "description": "Workflow primitive for the artifact ecosystem. Ships the worker agent, orchestration hooks, the execution artifact provider, the /workflow entry skill, and four meta-workflows (default, author, review, update). Depends on the artifact plugin for providers, templates, and the /artifact entry.",
+  "version": "2.0.0.dev0",
+  "description": "Workflow primitive for the artifact ecosystem. Ships the worker agent, python hooks, the `execution` scheme + `execution-gh-pr` storage, the `/workflow` entry skill, and four base workflows (default, conductor, plan-do, write-review). Depends on the artifact plugin for schemes, storage, templates, and the `/artifact` entry.",
   "author": {
     "name": "Christian Howe",
     "email": "cjhowe@users.noreply.github.com"
   },
   "license": "Apache-2.0",
   "requires": {
-    "artifact": ">=1.0.0"
+    "artifact": ">=2.0.0.dev0"
   },
   "keywords": [
     "workflow",

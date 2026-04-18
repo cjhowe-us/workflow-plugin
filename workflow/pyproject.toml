@@ -1,0 +1,25 @@
+[project]
+name = "workflow"
+version = "2.0.0.dev0"
+description = "Workflow primitive for the cjhowe-us/artifact Claude Code plugin ecosystem."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Christian Howe", email = "cjhowe@users.noreply.github.com" }]
+dependencies = [
+  "pydantic>=2,<3",
+  "pyyaml>=6",
+  "jinja2>=3.1",
+  "tomlkit>=0.13",
+  "artifact @ file:///Users/cjhowe/Code/artifact/artifact",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-xdist>=3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]

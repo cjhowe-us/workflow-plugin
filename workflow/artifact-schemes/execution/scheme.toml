@@ -1,0 +1,8 @@
+name             = "execution"
+scheme           = "execution"
+kind             = "vertex"
+description      = "Running or completed instance of a workflow, tracked as a long-lived artifact."
+contract_version = 1
+
+[[storage]]
+name = "execution-gh-pr"
