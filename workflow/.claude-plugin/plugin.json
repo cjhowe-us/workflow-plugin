@@ -1,17 +1,21 @@
 {
   "name": "workflow",
   "version": "1.0.0",
-  "description": "Generic workflow orchestration plugin. Two primitives — workflow and artifact — with a uniform artifact-provider contract. Ships the `default` orchestrator + tutor, `author`/`review`/`update` meta-workflows, and generic providers (execution, file-local, conversation, preferences, notifications). Designed for extension: workflow-github, workflow-documents, and workflow-sdlc ride on top.",
+  "description": "Workflow primitive for the artifact ecosystem. Ships the worker agent, orchestration hooks, the execution artifact provider, the /workflow entry skill, and four meta-workflows (default, author, review, update). Depends on the artifact plugin for providers, templates, and the /artifact entry.",
   "author": {
     "name": "Christian Howe",
     "email": "cjhowe@users.noreply.github.com"
   },
   "license": "Apache-2.0",
+  "requires": {
+    "artifact": ">=1.0.0"
+  },
   "keywords": [
     "workflow",
     "orchestrator",
-    "artifacts",
+    "worker",
     "dispatch",
     "agent-teams"
   ]
 }
+

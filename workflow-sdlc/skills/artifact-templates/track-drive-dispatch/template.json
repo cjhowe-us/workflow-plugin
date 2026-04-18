@@ -1,8 +1,0 @@
-{
-  "name": "track-drive-dispatch",
-  "contract_version": 1,
-  "produces_kind": "document",
-  "parameters": [
-    { "name": "target_scope", "type": "string", "required": false, "default": "all" }
-  ]
-}

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "artifact/contracts/artifact-provider",
+  "title": "Artifact provider scheme schema",
+  "description": "Meta-schema for the declarative per-scheme schema.json found at <plugin>/artifact-providers/<scheme>/schema.json. Each scheme ships one of these files describing its fields, subcommand surface, and graph relations. Backends conform to the scheme's schema.",
+  "type": "object",
+  "required": ["scheme", "subcommands"],
+  "additionalProperties": false,
+  "properties": {
+    "scheme": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Artifact scheme name. Must match the provider directory name."
+    },
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Major contract version. Providers may reject mismatched majors."
+    },
+    "fields": {
+      "type": "object",
+      "description": "Named payload fields on an artifact of this scheme. Each field declares its type and whether it's required.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "additionalProperties": true,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "markdown",
+              "integer",
+              "boolean",
+              "uri",
+              "enum",
+              "json",
+              "array"
+            ]
+          },
+          "required": { "type": "boolean", "default": false },
+          "values": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Required when type=enum."
+          },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "subcommands": {
+      "type": "object",
+      "description": "Subcommands every backend must (or may) implement. create/get/update/list are typically required; the rest are optional unless the scheme needs them.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "required": { "type": "boolean", "default": false },
+          "in": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Expected input field names (from the scheme's fields or generic like uri/filter/patch)."
+          },
+          "out": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Expected output field names."
+          },
+          "relations": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "For the edges subcommand: supported relation names."
+          }
+        }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "description": "Optional: declares which edge relations count as parent-to-child composition for this scheme. Defaults to [composed_of].",
+      "additionalProperties": false,
+      "properties": {
+        "relations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["composed_of"]
+        }
+      }
+    }
+  }
+}

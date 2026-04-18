@@ -1,0 +1,5 @@
+{
+  "name": "notifications",
+  "description": "Session-scoped notifications log. Append-only; capped at the most recent N entries. Backed by os-notifications (ephemeral session file).",
+  "contract_version": 1
+}

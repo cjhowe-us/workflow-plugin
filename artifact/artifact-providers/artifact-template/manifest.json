@@ -1,0 +1,5 @@
+{
+  "name": "artifact-template",
+  "description": "Artifact-template scheme. Templates are themselves artifacts — a single file whose frontmatter names a target scheme + inputs + optional composes/references and whose body is opaque payload the target provider consumes at instantiate time. Backed by any backend that can store text files; default is local-filesystem.",
+  "contract_version": 1
+}

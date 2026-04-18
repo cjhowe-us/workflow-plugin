@@ -1,0 +1,69 @@
+{
+  "scheme": "preferences",
+  "contract_version": 1,
+  "fields": {
+    "scope": {
+      "type": "string",
+      "required": true,
+      "description": "Scope segment (workspace, user, backends, tutor, ...)."
+    },
+    "values": {
+      "type": "json",
+      "description": "Key/value bag."
+    }
+  },
+  "subcommands": {
+    "get": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "values",
+        "edges"
+      ]
+    },
+    "create": {
+      "required": true,
+      "in": [
+        "uri",
+        "values"
+      ],
+      "out": [
+        "uri",
+        "created"
+      ]
+    },
+    "update": {
+      "required": true,
+      "in": [
+        "uri",
+        "patch"
+      ],
+      "out": [
+        "uri",
+        "updated"
+      ]
+    },
+    "list": {
+      "required": true,
+      "in": [
+        "filter"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "status": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "status"
+      ]
+    }
+  }
+}

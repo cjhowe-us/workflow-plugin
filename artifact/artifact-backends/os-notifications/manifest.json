@@ -1,0 +1,11 @@
+{
+  "name": "os-notifications",
+  "description": "Ephemeral session-scoped notifications backend. Appends to a capped JSONL file under $XDG_RUNTIME_DIR (or /tmp). Backs the notifications scheme.",
+  "contract_version": 1,
+  "supports_locking": false,
+  "supports_edges": false,
+  "min_poll_interval_s": 1,
+  "backs_schemes": [
+    "notifications"
+  ]
+}

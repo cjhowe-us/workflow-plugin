@@ -1,0 +1,47 @@
+---
+name: write-review
+scheme: execution
+description: Two-step artifact template — write an artifact, then review it. Optional redo loop when reviewer requests changes. Parameterized by `subject` (what kind of artifact). Produces one document artifact of the subject's document-template kind. Composable as a sub-workflow.
+contract_version: 1
+inputs:
+  - { name: 'subject', type: 'string', required: true }
+  - { name: 'owner', type: 'string', required: true }
+  - { name: 'context', type: 'artifact_uri', required: false }
+---
+
+---
+name: write-review
+description: Two-step artifact template — write an artifact, then review it. Optional redo loop when reviewer requests changes. Parameterized by `subject` (what kind of artifact). Produces one document artifact of the subject's document-template kind. Composable as a sub-workflow.
+contract_version: 1
+sdlc_phase: [author, review]
+inputs:
+  - { name: subject,  type: string,        required: true,  description: "Document-template kind to produce (e.g. design-document, release-note)" }
+  - { name: owner,    type: string,        required: true,  description: "GH user owning the work" }
+  - { name: context,  type: artifact_uri,  required: false, description: "Related artifact the author should reference" }
+outputs:
+  - { name: artifact, type: artifact_uri,  description: "Created document artifact URI" }
+graph:
+  steps:
+    - id: write
+      agent: worker
+      prompt_variant: author
+      template: "{{ subject }}"
+      description: "Generate the artifact using the subject's document template."
+    - id: review
+      agent: worker
+      prompt_variant: reviewer
+      gate: { type: review, prompt: "Approve the {{ subject }} or request changes?" }
+      description: "Review; reviewer approves or requests specific edits."
+  transitions:
+    - { id: t1, from: write,  to: review }
+    - { id: t2, from: review, to: write, metadata: { reasoning: "Reviewer requested changes", conditional: "llm-judge" } }
+dynamic_branches:
+  - step: review
+    judge: llm-judge
+    transitions: [t2]
+---
+
+# write-review
+
+Minimal cycle. Use directly (`/workflow start write-review --subject design-document`) or as a
+composed step inside a larger workflow.

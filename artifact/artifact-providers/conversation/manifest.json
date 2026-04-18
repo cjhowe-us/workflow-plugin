@@ -1,0 +1,5 @@
+{
+  "name": "conversation",
+  "description": "Conversation artifact scheme. A named, append-only log of turns. Backed by session-memory (default) or any store that persists JSONL streams. URIs: conversation|<backend>/<slug>.",
+  "contract_version": 1
+}

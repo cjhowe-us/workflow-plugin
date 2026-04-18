@@ -1,0 +1,5 @@
+{
+  "name": "directory",
+  "description": "Directory artifact scheme. Represents a filesystem subtree whose children are themselves artifacts (files, subdirectories, or any scheme a child template instantiates). Composition recorded on the graph as composed_of edges. Backed by local-filesystem (default) or any hierarchical storage backend.",
+  "contract_version": 1
+}

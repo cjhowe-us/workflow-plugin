@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "artifact/contracts/artifact-backend",
+  "title": "Artifact backend manifest",
+  "description": "Schema for <plugin>/artifact-backends/<name>/manifest.json. Backends declare which schemes they back and which optional capabilities they provide.",
+  "type": "object",
+  "required": ["name", "description", "contract_version", "backs_schemes"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Backend name. Must match the directory name."
+    },
+    "description": {
+      "type": "string",
+      "description": "One-paragraph description of the backend and the external system it wraps."
+    },
+    "contract_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Major contract version. Current: 1."
+    },
+    "backs_schemes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "description": "Schemes this backend can realize. Each must match a provider under some installed plugin's artifact-providers/."
+    },
+    "supports_locking": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the backend implements lock/release against this external system."
+    },
+    "supports_edges": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the backend can persist and return typed graph edges. False backends may still compute a get-time edges list from backend-native state."
+    },
+    "supports_find": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the backend implements reverse edge lookup (find --relation R --target U)."
+    },
+    "min_poll_interval_s": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Minimum interval between consecutive status/progress polls against this backend."
+    },
+    "env": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Environment variables the backend requires. Surfaced as a blocker if unset."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "scheme": "directory",
+  "contract_version": 1,
+  "fields": {
+    "path":     { "type": "string",  "required": true, "description": "Backend-relative path to the directory." },
+    "children": { "type": "array",                       "description": "URIs of child artifacts composed into the directory." },
+    "exists":   { "type": "boolean",                     "description": "Whether the directory exists on backend." }
+  },
+  "subcommands": {
+    "create": { "required": true,  "in": ["path", "children"], "out": ["uri", "created"] },
+    "get":    { "required": true,  "in": ["uri"],                "out": ["uri", "exists", "children", "edges"] },
+    "update": { "required": true,  "in": ["uri", "patch"],       "out": ["uri", "updated"] },
+    "list":   { "required": true,  "in": ["filter"],             "out": ["entries"] },
+    "delete": { "required": false, "in": ["uri"],                "out": ["deleted"] },
+    "status": { "required": true,  "in": ["uri"],                "out": ["uri", "status"] },
+    "edges":  { "required": false, "relations": ["composed_of", "depends_on"] }
+  }
+}

@@ -2,7 +2,6 @@
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-env-check.sh" }] },
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-discover.sh" }] },
       { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart-orchestrator-lock.sh" }] }
     ],
     "UserPromptSubmit": [

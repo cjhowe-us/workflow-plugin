@@ -1,0 +1,67 @@
+{
+  "scheme": "notifications",
+  "contract_version": 1,
+  "fields": {
+    "entries": {
+      "type": "array",
+      "description": "Recent notification entries (capped)."
+    }
+  },
+  "subcommands": {
+    "get": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "create": {
+      "required": true,
+      "in": [],
+      "out": [
+        "uri",
+        "created"
+      ]
+    },
+    "update": {
+      "required": false,
+      "in": [
+        "uri",
+        "patch"
+      ],
+      "out": [
+        "uri",
+        "updated"
+      ]
+    },
+    "list": {
+      "required": true,
+      "in": [],
+      "out": [
+        "entries"
+      ]
+    },
+    "status": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "status"
+      ]
+    },
+    "progress": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "entries",
+        "appended"
+      ]
+    }
+  }
+}

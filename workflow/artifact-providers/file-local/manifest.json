@@ -1,5 +1,0 @@
-{
-  "name": "file-local",
-  "description": "Local-filesystem artifact provider. URIs are `file-local:<relative-path>` resolved against the current worktree. Supports the full CRUD + lock + progress contract; progress is tracked in a sibling `.progress.jsonl` file. Used by the `file-local` artifact kind and as the default backing for `document` and `preferences` when their specialized providers are absent. contract_version 1.",
-  "contract_version": 1
-}

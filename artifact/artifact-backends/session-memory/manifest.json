@@ -1,0 +1,11 @@
+{
+  "name": "session-memory",
+  "description": "Session-scoped conversation backend. Persists JSONL files in the user's cache dir, addressed by slug. Backs the conversation scheme.",
+  "contract_version": 1,
+  "supports_locking": false,
+  "supports_edges": false,
+  "min_poll_interval_s": 1,
+  "backs_schemes": [
+    "conversation"
+  ]
+}

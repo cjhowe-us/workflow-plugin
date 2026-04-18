@@ -1,0 +1,5 @@
+{
+  "name": "file",
+  "description": "File artifact scheme. A leaf binary/text payload at a path. Backed by any filesystem-like storage (local-filesystem backend ships by default). URIs: file|<backend>/<backend-specific-id>.",
+  "contract_version": 1
+}

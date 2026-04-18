@@ -1,0 +1,104 @@
+{
+  "scheme": "conversation",
+  "contract_version": 1,
+  "fields": {
+    "slug": {
+      "type": "string",
+      "required": true,
+      "description": "Conversation slug."
+    },
+    "metadata": {
+      "type": "json",
+      "description": "Header metadata stored as the first line."
+    },
+    "turns": {
+      "type": "array",
+      "description": "Appended turns."
+    }
+  },
+  "subcommands": {
+    "create": {
+      "required": true,
+      "in": [
+        "slug",
+        "metadata"
+      ],
+      "out": [
+        "uri",
+        "created"
+      ]
+    },
+    "get": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "exists",
+        "turns",
+        "edges"
+      ]
+    },
+    "update": {
+      "required": true,
+      "in": [
+        "uri",
+        "turn"
+      ],
+      "out": [
+        "uri",
+        "updated"
+      ]
+    },
+    "list": {
+      "required": true,
+      "in": [
+        "filter"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "status": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "status"
+      ]
+    },
+    "progress": {
+      "required": false,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "lock": {
+      "required": false,
+      "in": [
+        "uri",
+        "owner"
+      ],
+      "out": [
+        "held",
+        "current_owner"
+      ]
+    },
+    "release": {
+      "required": false,
+      "in": [
+        "uri",
+        "owner"
+      ],
+      "out": [
+        "released"
+      ]
+    }
+  }
+}

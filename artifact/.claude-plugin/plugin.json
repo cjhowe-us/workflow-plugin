@@ -1,0 +1,15 @@
+{
+  "name": "artifact",
+  "version": "1.0.0",
+  "description": "Artifact primitive for the workflow ecosystem. Ships the /artifact entry skill, the artifact-provider contract, the artifact-template directory format with deterministic instantiation, and four core local providers (file-local, conversation, preferences, notifications). Depends on nothing; every other plugin in the ecosystem depends on this.",
+  "author": {
+    "name": "Christian Howe",
+    "email": "cjhowe@users.noreply.github.com"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "artifact",
+    "template",
+    "provider"
+  ]
+}

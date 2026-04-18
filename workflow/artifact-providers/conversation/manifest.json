@@ -1,5 +1,0 @@
-{
-  "name": "conversation",
-  "description": "Persisted AI-conversation artifact provider. URIs are `conversation:<slug>`; stored locally under $XDG_STATE_HOME/workflow/conversations/<slug>.jsonl as an append-only log of turns (user/assistant pairs). Used when a workflow needs to reference or resume an earlier conversation (debugging handoffs, onboarding rehearsals, session continuations). contract_version 1.",
-  "contract_version": 1
-}

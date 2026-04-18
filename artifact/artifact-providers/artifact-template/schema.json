@@ -1,0 +1,124 @@
+{
+  "scheme": "artifact-template",
+  "contract_version": 1,
+  "fields": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Template name (unique within the scope)."
+    },
+    "scheme": {
+      "type": "string",
+      "required": true,
+      "description": "Target artifact scheme this template produces."
+    },
+    "description": {
+      "type": "string",
+      "description": "Human summary of the template."
+    },
+    "inputs": {
+      "type": "array",
+      "description": "Declared inputs the template accepts."
+    },
+    "composes": {
+      "type": "array",
+      "description": "Child templates instantiated alongside (each becomes a composed_of child)."
+    },
+    "references": {
+      "type": "array",
+      "description": "Existing artifact URIs the produced artifact depends on."
+    },
+    "output_path": {
+      "type": "string",
+      "description": "Optional render target path; backend-specific."
+    },
+    "body": {
+      "type": "markdown",
+      "description": "Template text. Opaque to the engine."
+    },
+    "contract_version": {
+      "type": "integer"
+    }
+  },
+  "subcommands": {
+    "create": {
+      "required": true,
+      "in": [
+        "name",
+        "scheme",
+        "description",
+        "inputs",
+        "body"
+      ],
+      "out": [
+        "uri",
+        "created"
+      ]
+    },
+    "get": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "name",
+        "scheme",
+        "description",
+        "inputs",
+        "composes",
+        "references",
+        "output_path",
+        "body",
+        "edges"
+      ]
+    },
+    "update": {
+      "required": true,
+      "in": [
+        "uri",
+        "patch"
+      ],
+      "out": [
+        "uri",
+        "updated"
+      ]
+    },
+    "list": {
+      "required": true,
+      "in": [
+        "filter"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "delete": {
+      "required": false,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "deleted"
+      ]
+    },
+    "status": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "status"
+      ]
+    },
+    "edges": {
+      "required": false,
+      "relations": [
+        "composes",
+        "references",
+        "supersedes"
+      ]
+    }
+  }
+}

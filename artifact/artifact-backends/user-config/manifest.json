@@ -1,0 +1,11 @@
+{
+  "name": "user-config",
+  "description": "User-config backend. Persists key/value preferences in the user's OS-standard config directory, resolved via scripts/xdg.sh. Backs the preferences scheme.",
+  "contract_version": 1,
+  "supports_locking": false,
+  "supports_edges": false,
+  "min_poll_interval_s": 1,
+  "backs_schemes": [
+    "preferences"
+  ]
+}

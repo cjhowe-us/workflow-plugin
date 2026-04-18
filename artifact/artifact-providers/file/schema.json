@@ -1,0 +1,126 @@
+{
+  "scheme": "file",
+  "contract_version": 1,
+  "fields": {
+    "path": {
+      "type": "string",
+      "required": true,
+      "description": "Backend-relative path."
+    },
+    "content": {
+      "type": "string",
+      "description": "Text content. Binary payloads use content_base64 instead."
+    },
+    "content_base64": {
+      "type": "string",
+      "description": "Base64-encoded bytes, used for binary."
+    },
+    "exists": {
+      "type": "boolean",
+      "description": "Whether the file exists on backend."
+    }
+  },
+  "subcommands": {
+    "create": {
+      "required": true,
+      "in": [
+        "path",
+        "content"
+      ],
+      "out": [
+        "uri",
+        "created"
+      ]
+    },
+    "get": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "exists",
+        "content",
+        "edges"
+      ]
+    },
+    "update": {
+      "required": true,
+      "in": [
+        "uri",
+        "content"
+      ],
+      "out": [
+        "uri",
+        "updated"
+      ]
+    },
+    "list": {
+      "required": true,
+      "in": [
+        "filter"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "delete": {
+      "required": false,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "deleted"
+      ]
+    },
+    "lock": {
+      "required": false,
+      "in": [
+        "uri",
+        "owner"
+      ],
+      "out": [
+        "held",
+        "current_owner"
+      ]
+    },
+    "release": {
+      "required": false,
+      "in": [
+        "uri",
+        "owner"
+      ],
+      "out": [
+        "released"
+      ]
+    },
+    "status": {
+      "required": true,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "uri",
+        "status"
+      ]
+    },
+    "progress": {
+      "required": false,
+      "in": [
+        "uri"
+      ],
+      "out": [
+        "entries"
+      ]
+    },
+    "edges": {
+      "required": false,
+      "relations": [
+        "depends_on",
+        "mentions",
+        "cites",
+        "composed_of"
+      ]
+    }
+  }
+}

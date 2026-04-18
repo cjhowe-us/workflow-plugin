@@ -1,5 +1,0 @@
-{
-  "name": "preferences",
-  "description": "Workspace + user preferences artifact provider. URIs are `preferences:<scope>` where scope is `workspace` or `user`. Stored as JSON \u2014 workspace at $REPO/.claude/workflow.preferences.json, user at $HOME/.claude/workflow.preferences.json. Used for wip caps, orchestrator overrides, polling intervals, and any other per-repo or per-user setting. contract_version 1.",
-  "contract_version": 1
-}

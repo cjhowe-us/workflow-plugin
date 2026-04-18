@@ -1,5 +1,0 @@
-{
-  "name": "notifications",
-  "description": "Ephemeral status-line notifications. URIs are `notifications:session` (single-URI provider). In-session ring buffer at $XDG_RUNTIME_DIR/workflow/notifications.jsonl (or /tmp fallback); cleared on session end. Used by the `userpromptsubmit-status.sh` hook to surface low-level events like stale-lock warnings, discovery changes, rescan triggers. contract_version 1.",
-  "contract_version": 1
-}

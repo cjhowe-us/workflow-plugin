@@ -1,0 +1,5 @@
+{
+  "name": "preferences",
+  "description": "Preferences artifact scheme. Key/value bags scoped by URI path (workspace, user, scheme-defaults, etc.). Backed by user-config (default) which writes to the user's config dir.",
+  "contract_version": 1
+}

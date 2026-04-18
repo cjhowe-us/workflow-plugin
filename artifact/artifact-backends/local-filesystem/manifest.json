@@ -1,0 +1,13 @@
+{
+  "name": "local-filesystem",
+  "description": "Generic filesystem backend. Stores any filesystem-friendly artifact under the current git worktree. Backs file, directory, document, and artifact-template schemes (each opting in separately). Users may ship their own generic file backends (s3-filesystem, sftp-filesystem, git-tree, \u2026) by following the same contract.",
+  "contract_version": 1,
+  "supports_locking": true,
+  "supports_edges": true,
+  "min_poll_interval_s": 1,
+  "backs_schemes": [
+    "file",
+    "directory",
+    "artifact-template"
+  ]
+}

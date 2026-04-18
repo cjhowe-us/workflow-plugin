@@ -1,0 +1,17 @@
+{
+  "name": "artifact-github",
+  "version": "1.0.0",
+  "description": "GitHub artifact backends: gh-pr, gh-issue, gh-release, gh-milestone, gh-tag, gh-branch, gh-gist. Backs the corresponding artifact schemes against GitHub.",
+  "author": {
+    "name": "Christian Howe",
+    "email": "cjhowe@users.noreply.github.com"
+  },
+  "license": "Apache-2.0",
+  "requires": {
+    "artifact": ">=1.0.0"
+  },
+  "keywords": [
+    "artifact",
+    "github"
+  ]
+}
