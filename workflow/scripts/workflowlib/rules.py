@@ -12,7 +12,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-
 _BASH_WRITE_PATTERN = re.compile(r"(>>?|\brm\s+-[rf]+\b|\bmv\b|\btee\b|\bcp\b)\s+(\S+)")
 
 

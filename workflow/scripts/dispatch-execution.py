@@ -27,7 +27,9 @@ def _gh_user() -> str | None:
     try:
         out = subprocess.run(
             ["gh", "api", "user", "--jq", ".login"],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         if out.returncode == 0:
             return out.stdout.strip() or None
@@ -38,7 +40,9 @@ def _gh_user() -> str | None:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("template_dir", help="Path to the template directory containing manifest.json")
+    parser.add_argument(
+        "template_dir", help="Path to the template directory containing manifest.json"
+    )
     args = parser.parse_args(argv)
 
     template_dir = Path(args.template_dir)

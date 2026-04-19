@@ -15,6 +15,7 @@ from pathlib import Path
 def _bootstrap_artifactlib() -> None:
     try:
         import artifactlib  # noqa: F401
+
         return
     except ImportError:
         pass

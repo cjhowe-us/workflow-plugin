@@ -12,14 +12,11 @@ import json
 import re
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parent.parent
 HOOKS_DIR = REPO / "hooks"
 HOOKS_JSON = HOOKS_DIR / "hooks.json"
 
-_CMD_RE = re.compile(
-    r"^python3\s+\$\{CLAUDE_PLUGIN_ROOT\}/hooks/(?P<name>[A-Za-z0-9_\-]+\.py)$"
-)
+_CMD_RE = re.compile(r"^python3\s+\$\{CLAUDE_PLUGIN_ROOT\}/hooks/(?P<name>[A-Za-z0-9_\-]+\.py)$")
 
 
 def _iter_commands():

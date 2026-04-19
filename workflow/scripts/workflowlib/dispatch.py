@@ -20,7 +20,9 @@ from typing import Any
 from artifactlib import provider
 
 
-def instantiate(workflow_dir: Path, inputs: dict[str, Any], storage: str | None = None) -> dict[str, Any]:
+def instantiate(
+    workflow_dir: Path, inputs: dict[str, Any], storage: str | None = None
+) -> dict[str, Any]:
     if not (workflow_dir / "manifest.json").is_file():
         raise FileNotFoundError(f"workflow manifest missing: {workflow_dir}/manifest.json")
     if not (workflow_dir / "workflow.md").is_file():

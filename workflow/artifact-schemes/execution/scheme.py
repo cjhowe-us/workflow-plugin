@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
-
 from artifactlib.kinds import Kind
 from artifactlib.scheme import Scheme, Subcommand
-
+from pydantic import BaseModel, Field
 
 ExecutionStatus = Literal["running", "needs_attention", "aborted", "complete"]
 
@@ -114,13 +112,13 @@ SCHEME = Scheme(
     contract_version=1,
     content_model=ExecutionContent,
     subcommands={
-        "create":   Subcommand(in_model=CreateIn,   out_model=CreateOut,   required=True),
-        "get":      Subcommand(in_model=GetIn,      out_model=GetOut,      required=True),
-        "update":   Subcommand(in_model=UpdateIn,   out_model=UpdateOut,   required=True),
-        "list":     Subcommand(in_model=ListFilter, out_model=ListOut,     required=True),
-        "status":   Subcommand(in_model=StatusIn,   out_model=StatusOut,   required=True),
+        "create": Subcommand(in_model=CreateIn, out_model=CreateOut, required=True),
+        "get": Subcommand(in_model=GetIn, out_model=GetOut, required=True),
+        "update": Subcommand(in_model=UpdateIn, out_model=UpdateOut, required=True),
+        "list": Subcommand(in_model=ListFilter, out_model=ListOut, required=True),
+        "status": Subcommand(in_model=StatusIn, out_model=StatusOut, required=True),
         "progress": Subcommand(in_model=ProgressIn, out_model=ProgressOut, required=True),
-        "lock":     Subcommand(in_model=LockIn,     out_model=LockOut,     required=False),
-        "release":  Subcommand(in_model=ReleaseIn,  out_model=ReleaseOut,  required=False),
+        "lock": Subcommand(in_model=LockIn, out_model=LockOut, required=False),
+        "release": Subcommand(in_model=ReleaseIn, out_model=ReleaseOut, required=False),
     },
 )

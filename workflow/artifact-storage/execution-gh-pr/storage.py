@@ -30,7 +30,6 @@ for _ancestor in _HERE.parents:
 
 from artifactlib import uri as uri_mod
 
-
 SUMMARY_TAG = "<!-- wf:summary"
 LEDGER_TAG = "<!-- wf:ledger"
 PROGRESS_PREFIX = "<!-- wf:progress "
@@ -94,15 +93,23 @@ def _gh(args: list[str], *, text: str | None = None, timeout: int = 20) -> str:
 
 
 def _gh_pr_view(pr: PRRef, fields: list[str]) -> dict[str, Any]:
-    out = _gh([
-        "pr", "view", str(pr.number),
-        "--repo", pr.repo_spec,
-        "--json", ",".join(fields),
-    ])
+    out = _gh(
+        [
+            "pr",
+            "view",
+            str(pr.number),
+            "--repo",
+            pr.repo_spec,
+            "--json",
+            ",".join(fields),
+        ]
+    )
     return json.loads(out)
 
 
-def cmd_create(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None) -> dict[str, Any]:
+def cmd_create(
+    *, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None
+) -> dict[str, Any]:
     repo = input.repo
     head = input.head
     if not repo:
@@ -110,13 +117,16 @@ def cmd_create(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | N
     if not head:
         raise StorageError("create: head branch required")
 
-    summary_payload = json.dumps({
-        "version": 1,
-        "workflow": input.workflow,
-        "workflow_inputs": input.workflow_inputs,
-        "started_at": _now_iso(),
-        "status": "running",
-    }, separators=(",", ":"))
+    summary_payload = json.dumps(
+        {
+            "version": 1,
+            "workflow": input.workflow,
+            "workflow_inputs": input.workflow_inputs,
+            "started_at": _now_iso(),
+            "status": "running",
+        },
+        separators=(",", ":"),
+    )
 
     body = (
         f"{SUMMARY_TAG} {summary_payload} -->\n\n"
@@ -127,20 +137,27 @@ def cmd_create(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | N
     title = input.title or "workflow execution"
     base = input.base or "main"
 
-    out = _gh([
-        "pr", "create",
-        "--repo", repo,
-        "--title", title,
-        "--body", body,
-        "--base", base,
-        "--head", head,
-        "--draft",
-    ])
+    out = _gh(
+        [
+            "pr",
+            "create",
+            "--repo",
+            repo,
+            "--title",
+            title,
+            "--body",
+            body,
+            "--base",
+            base,
+            "--head",
+            head,
+            "--draft",
+        ]
+    )
     m = re.search(r"(\d+)\s*$", out.strip())
     if not m:
         raise StorageError(f"could not parse PR number from: {out.strip()}")
     number = int(m.group(1))
-    url = out.strip().splitlines()[-1] if out.strip() else ""
 
     owner = repo.split("/", 1)[0]
     repo_name = repo.split("/", 1)[1] if "/" in repo else repo
@@ -172,36 +189,60 @@ def cmd_get(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None
     }
 
 
-def cmd_update(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None) -> dict[str, Any]:
+def cmd_update(
+    *, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None
+) -> dict[str, Any]:
     pr = _parse_uri(input.uri)
-    existing = _gh([
-        "pr", "view", str(pr.number),
-        "--repo", pr.repo_spec,
-        "--json", "body",
-        "--jq", ".body",
-    ]).rstrip("\n")
+    existing = _gh(
+        [
+            "pr",
+            "view",
+            str(pr.number),
+            "--repo",
+            pr.repo_spec,
+            "--json",
+            "body",
+            "--jq",
+            ".body",
+        ]
+    ).rstrip("\n")
     new_body = existing + "\n\n<!-- wf:update -->\n" + json.dumps(input.patch)
-    _gh([
-        "pr", "edit", str(pr.number),
-        "--repo", pr.repo_spec,
-        "--body", new_body,
-    ])
+    _gh(
+        [
+            "pr",
+            "edit",
+            str(pr.number),
+            "--repo",
+            pr.repo_spec,
+            "--body",
+            new_body,
+        ]
+    )
     return {"uri": input.uri, "updated": True}
 
 
-def cmd_list(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None) -> dict[str, Any]:
+def cmd_list(
+    *, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None
+) -> dict[str, Any]:
     filt = input.filter or {}
     repo = filt.get("repo")
     if not repo:
         raise StorageError("list: filter.repo required")
     state = filt.get("state", "open")
-    out = _gh([
-        "pr", "list",
-        "--repo", repo,
-        "--state", state,
-        "--search", "in:body wf:summary",
-        "--json", "number,title,state,assignees,url",
-    ])
+    out = _gh(
+        [
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--state",
+            state,
+            "--search",
+            "in:body wf:summary",
+            "--json",
+            "number,title,state,assignees,url",
+        ]
+    )
     rows = json.loads(out) if out.strip() else []
     owner = repo.split("/", 1)[0]
     repo_name = repo.split("/", 1)[1] if "/" in repo else repo
@@ -211,7 +252,9 @@ def cmd_list(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | Non
                 "uri": f"execution|execution-gh-pr/{owner}/{repo_name}/{row['number']}",
                 "title": row.get("title"),
                 "state": row.get("state"),
-                "assignees": [a.get("login") for a in row.get("assignees", []) if isinstance(a, dict)],
+                "assignees": [
+                    a.get("login") for a in row.get("assignees", []) if isinstance(a, dict)
+                ],
                 "url": row.get("url"),
             }
             for row in rows
@@ -219,7 +262,9 @@ def cmd_list(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | Non
     }
 
 
-def cmd_lock(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None) -> dict[str, Any]:
+def cmd_lock(
+    *, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None
+) -> dict[str, Any]:
     pr = _parse_uri(input.uri)
     data = _gh_pr_view(pr, ["assignees"])
     assignees = data.get("assignees", [])
@@ -228,26 +273,40 @@ def cmd_lock(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | Non
     if current and current != input.owner:
         return {"held": False, "current_owner": current}
 
-    _gh([
-        "pr", "edit", str(pr.number),
-        "--repo", pr.repo_spec,
-        "--add-assignee", input.owner,
-    ])
+    _gh(
+        [
+            "pr",
+            "edit",
+            str(pr.number),
+            "--repo",
+            pr.repo_spec,
+            "--add-assignee",
+            input.owner,
+        ]
+    )
     return {"held": True, "current_owner": input.owner}
 
 
-def cmd_release(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None) -> dict[str, Any]:
+def cmd_release(
+    *, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None
+) -> dict[str, Any]:
     pr = _parse_uri(input.uri)
     data = _gh_pr_view(pr, ["assignees"])
     assignees = data.get("assignees", [])
     current = assignees[0].get("login") if assignees and isinstance(assignees[0], dict) else None
     if current == input.owner:
         try:
-            _gh([
-                "pr", "edit", str(pr.number),
-                "--repo", pr.repo_spec,
-                "--remove-assignee", input.owner,
-            ])
+            _gh(
+                [
+                    "pr",
+                    "edit",
+                    str(pr.number),
+                    "--repo",
+                    pr.repo_spec,
+                    "--remove-assignee",
+                    input.owner,
+                ]
+            )
         except StorageError:
             pass
     return {"released": True}
@@ -259,7 +318,9 @@ _STATUS_MAP = {
 }
 
 
-def cmd_status(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None) -> dict[str, Any]:
+def cmd_status(
+    *, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None
+) -> dict[str, Any]:
     pr = _parse_uri(input.uri)
     data = _gh_pr_view(pr, ["state", "isDraft", "closedAt", "mergedAt"])
     merged = bool(data.get("mergedAt"))
@@ -276,14 +337,22 @@ def cmd_status(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | N
 _PROGRESS_RE = re.compile(r"<!-- wf:progress (?P<p>\{.*?\}) -->", re.DOTALL)
 
 
-def cmd_progress(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None) -> dict[str, Any]:
+def cmd_progress(
+    *, scheme: Any, adapter: dict[str, Any], input: Any, uri: str | None
+) -> dict[str, Any]:
     pr = _parse_uri(input.uri)
     if input.append is None:
-        out = _gh([
-            "pr", "view", str(pr.number),
-            "--repo", pr.repo_spec,
-            "--json", "comments",
-        ])
+        out = _gh(
+            [
+                "pr",
+                "view",
+                str(pr.number),
+                "--repo",
+                pr.repo_spec,
+                "--json",
+                "comments",
+            ]
+        )
         data = json.loads(out) if out.strip() else {"comments": []}
         entries: list[dict[str, Any]] = []
         for comment in data.get("comments", []):
@@ -302,9 +371,15 @@ def cmd_progress(*, scheme: Any, adapter: dict[str, Any], input: Any, uri: str |
     entry_json = json.dumps(input.append, separators=(",", ":"))
     summary = input.append.get("summary") or input.append.get("step") or "progress"
     body = f"<!-- wf:progress {entry_json} -->\n{summary}"
-    _gh([
-        "pr", "comment", str(pr.number),
-        "--repo", pr.repo_spec,
-        "--body", body,
-    ])
+    _gh(
+        [
+            "pr",
+            "comment",
+            str(pr.number),
+            "--repo",
+            pr.repo_spec,
+            "--body",
+            body,
+        ]
+    )
     return {"entries": [], "appended": True}

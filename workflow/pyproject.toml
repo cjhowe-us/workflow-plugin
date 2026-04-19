@@ -25,3 +25,17 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["scripts", "../../artifact/artifact/scripts"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Default rules: E (pycodestyle errors), F (pyflakes). Add I (import sort).
+extend-select = ["I"]
+
+[tool.ruff.lint.per-file-ignores]
+# These modules bootstrap `artifactlib` onto sys.path before importing it,
+# which legitimately requires imports below executable code.
+"artifact-storage/execution-gh-pr/storage.py" = ["E402"]
+"scripts/dispatch-execution.py" = ["E402"]

@@ -38,8 +38,7 @@ def check() -> EnvReport:
 
     if os.environ.get("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS") != "1":
         r.fatal.append(
-            "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS must be set to 1. "
-            "Export it in your shell rc."
+            "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS must be set to 1. Export it in your shell rc."
         )
 
     return r

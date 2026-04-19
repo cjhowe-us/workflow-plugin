@@ -6,7 +6,6 @@ from pathlib import Path
 
 from workflowlib import conformance
 
-
 REPO = Path(__file__).resolve().parent.parent
 
 

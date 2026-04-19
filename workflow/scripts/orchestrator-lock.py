@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Operate on the per-machine orchestrator flock.
 
-    orchestrator-lock.py status   # print current holder (or "free")
-    orchestrator-lock.py release  # clear the lock file (use with caution)
+orchestrator-lock.py status   # print current holder (or "free")
+orchestrator-lock.py release  # clear the lock file (use with caution)
 """
 
 from __future__ import annotations

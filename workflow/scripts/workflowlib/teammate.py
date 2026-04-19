@@ -6,8 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from artifactlib import xdg
-
 
 def rescan() -> None:
     """Call the artifact discover script. Best-effort; failure is non-fatal."""

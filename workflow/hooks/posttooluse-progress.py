@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import subprocess
 import sys
-import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -43,13 +43,15 @@ def main() -> int:
         return 0
 
     scheme = exec_uri.split(":", 1)[0]
-    entry = json.dumps({
-        "at": _now(),
-        "kind": "tool_use",
-        "summary": summary,
-        "tool": payload.get("tool_name"),
-        "auto_generated": True,
-    })
+    entry = json.dumps(
+        {
+            "at": _now(),
+            "kind": "tool_use",
+            "summary": summary,
+            "tool": payload.get("tool_name"),
+            "auto_generated": True,
+        }
+    )
 
     run_provider = Path(__file__).resolve().parent.parent / "scripts" / "run-provider.py"
     artifact_run_provider = Path("/Users/cjhowe/Code/artifact/artifact/scripts/run-provider.py")
@@ -58,7 +60,9 @@ def main() -> int:
     try:
         subprocess.run(
             [sys.executable, str(script), scheme, "progress", "--uri", exec_uri, "--append", "-"],
-            input=entry, text=True, timeout=10,
+            input=entry,
+            text=True,
+            timeout=10,
         )
     except (OSError, subprocess.SubprocessError):
         pass

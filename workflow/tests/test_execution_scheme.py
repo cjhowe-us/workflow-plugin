@@ -9,7 +9,9 @@ from pathlib import Path
 import pytest
 
 SCHEME_PY = Path(__file__).resolve().parent.parent / "artifact-schemes" / "execution" / "scheme.py"
-STORAGE_PY = Path(__file__).resolve().parent.parent / "artifact-storage" / "execution-gh-pr" / "storage.py"
+STORAGE_PY = (
+    Path(__file__).resolve().parent.parent / "artifact-storage" / "execution-gh-pr" / "storage.py"
+)
 
 
 def _load(name: str, path: Path):

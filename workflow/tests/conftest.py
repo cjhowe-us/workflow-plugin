@@ -5,13 +5,11 @@ Mirrors the conftest patterns shipped by the artifact + artifact-github plugins.
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-
 
 REPO = Path(__file__).resolve().parent.parent
 WORKFLOW_SCRIPTS = REPO / "scripts"

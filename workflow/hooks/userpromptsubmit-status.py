@@ -3,22 +3,23 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from workflowlib import lock, paths
 from artifactlib import registry
+from workflowlib import lock
 
 
 def _gh_user() -> str:
     try:
         out = subprocess.run(
             ["gh", "api", "user", "--jq", ".login"],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         if out.returncode == 0:
             return out.stdout.strip() or "unknown"
