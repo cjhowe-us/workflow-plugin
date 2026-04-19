@@ -61,17 +61,15 @@ ignore = ["ANN101", "ANN102", "ANN401"]
 "scripts/dispatch-execution.py" = ["E402"]
 "tests/**" = ["ANN"]
 
-[tool.mypy]
-python_version = "3.11"
-strict = true
-mypy_path = "scripts:../../artifact-plugin/artifact-plugin/scripts:../../artifact/artifact/scripts"
-explicit_package_bases = true
-namespace_packages = true
-files = ["scripts", "hooks", "artifact-schemes", "artifact-storage"]
-# Plugin-cache deployments install artifactlib next to us; in CI we sibling-
-# checkout the artifact repo. Either way the import is dynamic — silence the
-# follow-imports noise but keep our own code strict.
-[[tool.mypy.overrides]]
-module = ["artifactlib", "artifactlib.*"]
-ignore_missing_imports = true
-follow_imports = "skip"
+[tool.ty.src]
+include = ["scripts", "hooks", "artifact-schemes", "artifact-storage"]
+exclude = ["**/tests/**", "**/.venv/**", "**/dist/**"]
+
+[tool.ty.environment]
+python-version = "3.11"
+# artifactlib lives in the sibling artifact-plugin checkout (CI) or in the
+# plugin cache (runtime). List both so either works.
+extra-paths = [
+  "scripts",
+  "../../artifact-plugin/artifact-plugin/scripts",
+]

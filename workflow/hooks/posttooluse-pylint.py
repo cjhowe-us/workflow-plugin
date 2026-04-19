@@ -22,7 +22,7 @@ def _edited_path(payload: dict[str, object]) -> Path | None:
         return None
     if tool not in {"Edit", "Write"}:
         return None
-    p = raw.get("file_path")
+    p = raw.get("file_path")  # ty: ignore[invalid-argument-type]
     if not isinstance(p, str) or not p.endswith(".py"):
         return None
     path = Path(p)

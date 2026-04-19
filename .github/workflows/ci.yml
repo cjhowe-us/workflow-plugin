@@ -23,8 +23,8 @@ jobs:
       - name: ruff format --check
         run: uvx ruff format --check workflow
 
-  mypy:
-    name: mypy --strict
+  ty:
+    name: ty
     runs-on: ubuntu-latest
     steps:
       - name: Checkout workflow
@@ -32,11 +32,11 @@ jobs:
         with:
           path: workflow
 
-      - name: Checkout sibling artifact plugin
+      - name: Checkout sibling artifact-plugin
         uses: actions/checkout@v4
         with:
-          repository: cjhowe-us/artifact
-          path: artifact
+          repository: cjhowe-us/artifact-plugin
+          path: artifact-plugin
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -45,13 +45,15 @@ jobs:
           enable-cache: true
           cache-dependency-glob: workflow/workflow/pyproject.toml
 
-      - name: Install workflow + dev deps
+      - name: Install workflow + dev deps into a venv
         working-directory: workflow/workflow
-        run: uv pip install --system -e ".[dev]"
+        run: |
+          uv venv .venv --python 3.12
+          uv pip install --python .venv/bin/python -e ".[dev]"
 
-      - name: mypy --strict
+      - name: ty check
         working-directory: workflow/workflow
-        run: python -m mypy
+        run: uvx ty check --python .venv/bin/python
 
   pytest:
     name: pytest (${{ matrix.os }}, py${{ matrix.python-version }})
@@ -68,13 +70,14 @@ jobs:
           path: workflow
 
       # Sibling checkout — workflow/tests/conftest.py and pyproject.toml's
-      # pythonpath both expect ../artifact/artifact/scripts to exist so the
-      # `artifactlib` import resolves without publishing artifact to PyPI.
-      - name: Checkout sibling artifact plugin
+      # pythonpath both expect ../artifact-plugin/artifact-plugin/scripts to
+      # exist so the `artifactlib` import resolves without publishing
+      # artifact-plugin to PyPI.
+      - name: Checkout sibling artifact-plugin
         uses: actions/checkout@v4
         with:
-          repository: cjhowe-us/artifact
-          path: artifact
+          repository: cjhowe-us/artifact-plugin
+          path: artifact-plugin
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5

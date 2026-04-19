@@ -6,18 +6,15 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
+  - repo: local
     hooks:
-      - id: mypy
-        args: [--config-file=workflow/pyproject.toml]
-        additional_dependencies:
-          - pydantic>=2,<3
-          - tomlkit>=0.13
-          - jinja2>=3.1
-          - pyyaml>=6
-          - types-PyYAML>=6
+      - id: ty
+        name: ty (type check)
+        entry: uvx ty check --project workflow
+        language: system
+        types: [python]
         pass_filenames: false
+        require_serial: true
 
   # Inherit `new-file-tests` from python-plugin (single source of truth).
   - repo: https://github.com/cjhowe-us/python-plugin
