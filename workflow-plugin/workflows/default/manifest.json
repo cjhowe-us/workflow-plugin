@@ -48,10 +48,10 @@
       },
       {
         "id": "tutor",
-        "when": "tutor_completed == false",
+        "when": "initialized == false || tutor_completed == false",
         "agent": "worker",
         "prompt_variant": "tutor",
-        "description": "Walk the user through the workflow + artifact primitives, enumerate installed extensions, and offer a guided try-it. Sets preferences:user.tutor.completed=true on finish."
+        "description": "Walk the user through the workflow + artifact primitives, enumerate installed extensions, and offer a guided try-it. Fires whenever seed ran (initialized was false at dispatch) or tutor_completed is false. Sets preferences:user.extra.tutor_completed=true on finish."
       },
       {
         "id": "interpret",

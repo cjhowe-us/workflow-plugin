@@ -43,9 +43,11 @@ def main() -> int:
             "workflows": sum(1 for e in entries if e.get("entry_type") == "workflow"),
             "templates": sum(1 for e in entries if e.get("entry_type") == "artifact-template"),
             "schemes": sum(1 for e in entries if e.get("entry_type") == "artifact-scheme"),
+            "storages": sum(1 for e in entries if e.get("entry_type") == "artifact-storage"),
         }
         parts.append(
-            f"{counts['workflows']} workflows, {counts['templates']} templates, {counts['schemes']} schemes"
+            f"{counts['workflows']} workflows, {counts['templates']} templates, "
+            f"{counts['schemes']} schemes, {counts['storages']} storages"
         )
     except registry.RegistryMissing:
         pass

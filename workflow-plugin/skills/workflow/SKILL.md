@@ -80,9 +80,10 @@ Each question offers the proposed default first, other installed backends next, 
 backends leave the corresponding preference key unset; the user can wire one up later via the `conductor` workflow. Off
 GitHub, the defaults are empty and the user picks an available backend (or declines) for each slot.
 
-The `tutor` step fires when `tutor_completed == false`: walks the user through the two primitives, enumerates installed
-extensions, and offers a guided try-it. Sets `preferences:user.extra.tutor_completed = true` on finish. Re-open later
-with `/workflow teach me again`.
+The `tutor` step fires when `initialized == false || tutor_completed == false` — i.e., whenever `seed` ran (first-run
+setup) or the user has never completed the tutor. This guarantees seed → tutor always chain on first run. It walks the
+user through the two primitives, enumerates installed extensions, and offers a guided try-it. Sets
+`preferences:user.extra.tutor_completed = true` on finish. Re-open later with `/workflow teach me again`.
 
 ## Invariants held here
 

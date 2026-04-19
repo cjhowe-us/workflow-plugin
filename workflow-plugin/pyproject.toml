@@ -1,6 +1,6 @@
 [project]
 name = "workflow-plugin"
-version = "2.2.0"
+version = "2.3.0"
 description = "Workflow primitive for the cjhowe-us/artifact Claude Code plugin ecosystem."
 readme = "README.md"
 requires-python = ">=3.11"

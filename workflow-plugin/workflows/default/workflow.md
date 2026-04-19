@@ -44,11 +44,12 @@ independent backend confirmations. Every backend is pluggable and optional — t
    - `preferences:workspace/<repo-hash>.extra.overlay_dependencies = <chosen>` (omitted when declined)
 6. Emit a progress entry summarizing what was wired up, and fall through to `tutor`.
 
-## Step: tutor (when: `tutor_completed == false`)
+## Step: tutor (when: `initialized == false || tutor_completed == false`)
 
-Walk the user through the two primitives (workflow, artifact), enumerate installed extensions, and offer a guided
-try-it. Sets `preferences:user.extra.tutor_completed = true` on finish. The user can re-open with
-`/workflow teach me again`.
+Walks the user through the two primitives (workflow, artifact), enumerates installed extensions, and offers a guided
+try-it. Fires whenever `seed` ran (`initialized` was false at dispatch time) **or** `tutor_completed` is false — the
+first-run path always chains seed → tutor, even if `tutor_completed` is somehow true. Sets
+`preferences:user.extra.tutor_completed = true` on finish. The user can re-open later with `/workflow teach me again`.
 
 ## Step: interpret
 

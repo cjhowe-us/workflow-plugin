@@ -1,5 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "enabledPlugins": {
+    "artifact-plugin@cjhowe-us-marketplace": true,
+    "artifact-github-plugin@cjhowe-us-marketplace": true,
+    "artifact-documents-plugin@cjhowe-us-marketplace": true,
+    "python-plugin@cjhowe-us-marketplace": true,
+    "workflow-plugin@cjhowe-us-marketplace": true
+  },
   "extraKnownMarketplaces": {
     "cjhowe-us-marketplace": {
       "source": {
@@ -7,13 +14,5 @@
         "repo": "cjhowe-us/marketplace"
       }
     }
-  },
-  "enabledPlugins": {
-    "artifact-plugin@cjhowe-us-marketplace": true,
-    "workflow-plugin@cjhowe-us-marketplace": true,
-    "artifact-github-plugin@cjhowe-us-marketplace": true,
-    "artifact-documents-plugin@cjhowe-us-marketplace": true,
-    "python-plugin@cjhowe-us-marketplace": true,
-    "rumdl@cjhowe-us-marketplace": true
   }
 }
