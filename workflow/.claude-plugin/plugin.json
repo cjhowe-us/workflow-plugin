@@ -1,6 +1,6 @@
 {
   "name": "workflow",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Workflow primitive for the artifact ecosystem. Ships the worker agent, python hooks, the `execution` scheme + `execution-gh-pr` storage, the `/workflow` entry skill, and four base workflows (default, conductor, plan-do, write-review). Depends on the artifact plugin for schemes, storage, templates, and the `/artifact` entry.",
   "author": {
     "name": "Christian Howe",
